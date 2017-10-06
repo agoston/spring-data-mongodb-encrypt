@@ -1,0 +1,35 @@
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea
+classes
+
+# Eclipse
+.classpath
+.project
+.buildpath
+.springBeans
+.settings/
+.metadata/
+
+# Netbeans
+nb-configuration.xml
+
+# Maven
+target
+pom.xml.versionsBackup
+
+# Gradle
+build
+.gradle
+
+# OS
+Thumbs.db
+.DS_Store
+
+# misc
+.checkstyle
+.pmd
+.fbprefs
+MANIFEST.MF
