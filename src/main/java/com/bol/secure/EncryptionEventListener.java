@@ -6,18 +6,17 @@ import com.mongodb.DBObject;
 import org.bson.BSONObject;
 import org.bson.BasicBSONDecoder;
 import org.bson.BasicBSONEncoder;
-import org.bson.types.Binary;
+import org.bson.BasicBSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeansException;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.mapping.BasicMongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventListener;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 
+import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -28,7 +27,9 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.function.Function;
 
-public class EncryptionEventListener extends AbstractMongoEventListener implements ApplicationContextAware {
+
+// FIXME: key versioning
+public class EncryptionEventListener extends AbstractMongoEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(EncryptionEventListener.class);
     static final String MAP_FIELD_MATCHER = "*";
     static final String CIPHER = "AES/CBC/PKCS5Padding";
@@ -53,13 +54,15 @@ public class EncryptionEventListener extends AbstractMongoEventListener implemen
         this.key = new SecretKeySpec(secret, cipher.substring(0, cipher.indexOf('/')));
     }
 
-    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+    @Autowired MongoMappingContext mappingContext;
+
+    @PostConstruct
+    public void initReflection() {
         encrypted = new HashMap<>();
-        MongoMappingContext mappingContext = applicationContext.getAutowireCapableBeanFactory().getBean(MongoMappingContext.class);
 
         for (BasicMongoPersistentEntity<?> entity : mappingContext.getPersistentEntities()) {
-            List<Node> children = processDocument(entity.getClass());
-            if (!children.isEmpty()) encrypted.put(entity.getClass(), new Node("", children, NodeType.ROOT));
+            List<Node> children = processDocument(entity.getType());
+            if (!children.isEmpty()) encrypted.put(entity.getType(), new Node("", children, NodeType.ROOT));
         }
     }
 
@@ -68,6 +71,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener implemen
         for (Field field : objectClass.getDeclaredFields()) {
             try {
                 if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) continue;
+                if (!field.isAnnotationPresent(org.springframework.data.mongodb.core.mapping.Field.class)) continue;
 
                 if (field.isAnnotationPresent(Encrypted.class)) {
                     // direct @Encrypted annotation - crypt the corresponding field of BasicDbObject
@@ -114,11 +118,19 @@ public class EncryptionEventListener extends AbstractMongoEventListener implemen
             Node node = encrypted.get(event.getType());
             if (node == null) return;
 
-            BasicBSONDecoder decoder = new BasicBSONDecoder();
-            cryptFields(dbObject, node, o -> decoder.readObject(decrypt((byte[]) o)));
+            cryptFields(dbObject, node, new Decoder()::apply);
         } catch (Exception e) {
             LOG.error("onAfterLoad", e);
             throw e;
+        }
+    }
+
+    private class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
+        public Object apply(Object o) {
+            // fixme: we know the object type already from the 'ecrypted' map; use it!
+            return readObject(decrypt((byte[]) o));
+
+            // fixme: decrypt
         }
     }
 
@@ -130,11 +142,26 @@ public class EncryptionEventListener extends AbstractMongoEventListener implemen
             Node node = encrypted.get(event.getSource().getClass());
             if (node == null) return;
 
-            BasicBSONEncoder encoder = new BasicBSONEncoder();
-            cryptFields(dbObject, node, o -> new Binary(encrypt(encoder.encode((BSONObject) o))));
+            cryptFields(dbObject, node, new Encoder()::apply);
         } catch (Exception e) {
             LOG.error("onBeforeSave", e);
             throw e;
+        }
+    }
+
+    private class Encoder extends BasicBSONEncoder implements Function<Object, Object> {
+        public Object apply(Object o) {
+            byte[] serialized;
+
+            // fixme: we know the object type already from the 'encrypted' map; use it!
+            if (o instanceof BSONObject) {
+                serialized = encode((BSONObject) o);
+            } else {
+                // FIXME: make SingletonBsonObject for performace (also jmh it!)
+                serialized = encode(new BasicBSONObject("", o));
+            }
+
+            return encrypt(serialized);
         }
     }
 
@@ -161,14 +188,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener implemen
                 return;
             }
 
-            if (value instanceof BasicDBList) {
-                BasicDBList leafArray = (BasicDBList) value;
-                for (int i = 0; i < leafArray.size(); i++) {
-                    leafArray.set(i, crypt.apply(leafArray.get(i)));
-                }
-            } else {
-                dbObject.put(childNode.fieldName, crypt.apply(value));
-            }
+            dbObject.put(childNode.fieldName, crypt.apply(value));
         }
     }
 
