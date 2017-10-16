@@ -7,6 +7,7 @@ import org.bson.BSONObject;
 import org.bson.BasicBSONDecoder;
 import org.bson.BasicBSONEncoder;
 import org.bson.BasicBSONObject;
+import org.bson.types.Binary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventListener;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
@@ -27,12 +29,13 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.function.Function;
 
-
 // FIXME: key versioning
 public class EncryptionEventListener extends AbstractMongoEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(EncryptionEventListener.class);
     static final String MAP_FIELD_MATCHER = "*";
-    static final String CIPHER = "AES/CBC/PKCS5Padding";
+
+    static final String DEFAULT_CIPHER = "AES/CBC/PKCS5Padding";
+    static final int DEFAULT_SALT_LENGTH = 16;
 
     final int saltLength;
     final String cipher;
@@ -41,11 +44,11 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
     Map<Class, Node> encrypted;
 
     public EncryptionEventListener(byte[] secret) {
-        this(secret, 16, CIPHER);
+        this(secret, DEFAULT_SALT_LENGTH, DEFAULT_CIPHER);
     }
 
     public EncryptionEventListener(byte[] secret, int saltLength) {
-        this(secret, saltLength, CIPHER);
+        this(secret, saltLength, DEFAULT_CIPHER);
     }
 
     public EncryptionEventListener(byte[] secret, int saltLength, String cipher) {
@@ -127,10 +130,13 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
     private class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
         public Object apply(Object o) {
-            // fixme: we know the object type already from the 'ecrypted' map; use it!
-            return readObject(decrypt((byte[]) o));
-
-            // fixme: decrypt
+            byte[] serialized = decrypt((byte[]) o);
+            BSONObject bsonObject = readObject(serialized);
+            Set<String> keys = bsonObject.keySet();
+            if (keys.size() == 1 && keys.iterator().next().length() == 0) {
+                return bsonObject.get("");
+            }
+            return bsonObject;
         }
     }
 
@@ -153,15 +159,13 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         public Object apply(Object o) {
             byte[] serialized;
 
-            // fixme: we know the object type already from the 'encrypted' map; use it!
             if (o instanceof BSONObject) {
                 serialized = encode((BSONObject) o);
             } else {
-                // FIXME: make SingletonBsonObject for performace (also jmh it!)
                 serialized = encode(new BasicBSONObject("", o));
             }
 
-            return encrypt(serialized);
+            return new Binary(encrypt(serialized));
         }
     }
 
@@ -196,14 +200,19 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         try {
             return Cipher.getInstance(cipher);
         } catch (Exception e) {
-            LOG.error("Mongo encrypt init failed for cipher {}", cipher, e);
+            LOG.error("spring-data-mongodb-encrypt: init failed for cipher {}", cipher, e);
             return null;
         }
     }
 
-    public static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    public SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    static byte[] urandomBytes(int numBytes) {
+    @Scheduled(initialDelay = 3_600_000, fixedDelay = 3_600_000)
+    public void reinitSecureRandomHourly() {
+        SECURE_RANDOM = new SecureRandom();
+    }
+
+    byte[] urandomBytes(int numBytes) {
         byte[] bytes = new byte[numBytes];
         SECURE_RANDOM.nextBytes(bytes);
         return bytes;
