@@ -50,13 +50,10 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
      */
     public EncryptionEventListener with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(int version, byte[] secret) {
         if (secret.length != 32) throw new IllegalArgumentException("invalid AES key size; should be 256 bits!");
-        if (version < 0 || version > 255) throw new IllegalArgumentException("version must be a byte");
-        if (cryptVersions[version] != null) throw new IllegalArgumentException("version " + version + " is already defined");
 
         Key key = new SecretKeySpec(secret, DEFAULT_ALGORITHM);
-        cryptVersions[version] = new CryptVersion(DEFAULT_SALT_LENGTH, DEFAULT_CIPHER, key, AESLengthCalculator);
-        if (version > defaultVersion) defaultVersion = version;
-        return this;
+        CryptVersion cryptVersion = new CryptVersion(DEFAULT_SALT_LENGTH, DEFAULT_CIPHER, key, AESLengthCalculator);
+        return withKey(version, cryptVersion);
     }
 
     public EncryptionEventListener withKey(int version, CryptVersion cryptVersion) {
@@ -255,7 +252,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
             int len = cipher.doFinal(data, 0, data.length, result, cryptVersion.saltLength + 1);
 
             // fixme remove
-            if (len != cryptedLength) System.err.println("len was "+len+" instead of "+cryptedLength);
+            if (len != cryptedLength) System.err.println("len was " + len + " instead of " + cryptedLength);
 
             return result;
         } catch (Exception e) {

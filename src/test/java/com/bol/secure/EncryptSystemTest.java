@@ -51,4 +51,14 @@ public class EncryptSystemTest {
         int expectedLength = cryptVersion.saltLength + 1 + cryptVersion.encryptedLength.apply(bean.secretData.length());
         assertThat(cryptedBytes.length, is(expectedLength));
     }
+
+    @Test
+    public void consecutiveEncryptsDifferentResults() {
+        // fixme
+    }
+
+    // fixme: unit test for preparing the model via reflection
+    // fixme: explode code into smaller parts/classes
+    // fixme:
+
 }
