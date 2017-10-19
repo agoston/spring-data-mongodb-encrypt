@@ -12,9 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.isA;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
@@ -25,6 +23,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 public class EncryptSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;
+    @Autowired EncryptionEventListener encryptionEventListener;
 
     @Before
     public void cleanDb() {
@@ -46,5 +45,10 @@ public class EncryptSystemTest {
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
         Object cryptedSecret = fromMongo.get(MyBean.MONGO_SECRETDATA);
         assertThat(cryptedSecret, is(instanceOf(byte[].class)));
+
+        byte[] cryptedBytes = (byte[]) cryptedSecret;
+        CryptVersion cryptVersion = encryptionEventListener.cryptVersions[encryptionEventListener.defaultVersion];
+        int expectedLength = cryptVersion.saltLength + 1 + cryptVersion.encryptedLength.apply(bean.secretData.length());
+        assertThat(cryptedBytes.length, is(expectedLength));
     }
 }
