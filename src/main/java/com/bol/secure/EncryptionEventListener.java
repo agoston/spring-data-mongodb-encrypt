@@ -8,8 +8,6 @@ import org.bson.BasicBSONDecoder;
 import org.bson.BasicBSONEncoder;
 import org.bson.BasicBSONObject;
 import org.bson.types.Binary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.mapping.BasicMongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
@@ -25,39 +23,59 @@ import javax.crypto.spec.SecretKeySpec;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.security.Key;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.function.Function;
 
-// FIXME: key versioning
+import static com.bol.util.Thrower.reThrow;
+
 public class EncryptionEventListener extends AbstractMongoEventListener {
-    private static final Logger LOG = LoggerFactory.getLogger(EncryptionEventListener.class);
     static final String MAP_FIELD_MATCHER = "*";
 
     static final String DEFAULT_CIPHER = "AES/CBC/PKCS5Padding";
+    static final String DEFAULT_ALGORITHM = "AES";
     static final int DEFAULT_SALT_LENGTH = 16;
 
-    final int saltLength;
-    final String cipher;
-    final SecretKeySpec key;
+    CryptVersion[] cryptVersions = new CryptVersion[256];
+    int defaultVersion = -1;
 
     Map<Class, Node> encrypted;
 
-    public EncryptionEventListener(byte[] secret) {
-        this(secret, DEFAULT_SALT_LENGTH, DEFAULT_CIPHER);
-    }
-
-    public EncryptionEventListener(byte[] secret, int saltLength) {
-        this(secret, saltLength, DEFAULT_CIPHER);
-    }
-
-    public EncryptionEventListener(byte[] secret, int saltLength, String cipher) {
-        this.saltLength = saltLength;
-        this.cipher = cipher;
-        this.key = new SecretKeySpec(secret, cipher.substring(0, cipher.indexOf('/')));
-    }
-
     @Autowired MongoMappingContext mappingContext;
+
+    /**
+     * Helper method for the most used case.
+     * If you even need to change this, or need backwards compatibility, use the more advanced constructor instead.
+     */
+    public EncryptionEventListener with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(int version, byte[] secret) {
+        if (secret.length != 32) throw new IllegalArgumentException("invalid AES key size; should be 256 bits!");
+        if (version < 0 || version > 255) throw new IllegalArgumentException("version must be a byte");
+        if (cryptVersions[version] != null) throw new IllegalArgumentException("version " + version + " is already defined");
+
+        Key key = new SecretKeySpec(secret, DEFAULT_ALGORITHM);
+        cryptVersions[version] = new CryptVersion(DEFAULT_SALT_LENGTH, DEFAULT_CIPHER, key, AESLengthCalculator);
+        if (version > defaultVersion) defaultVersion = version;
+        return this;
+    }
+
+    public EncryptionEventListener withKey(int version, CryptVersion cryptVersion) {
+        if (version < 0 || version > 255) throw new IllegalArgumentException("version must be a byte");
+        if (cryptVersions[version] != null) throw new IllegalArgumentException("version " + version + " is already defined");
+
+        cryptVersions[version] = cryptVersion;
+        if (version > defaultVersion) defaultVersion = version;
+        return this;
+    }
+
+    /** specifies the version used in encrypting new data. default is highest version number. */
+    public EncryptionEventListener withDefaultKeyVersion(int defaultVersion) {
+        if (defaultVersion < 0 || defaultVersion > 255) throw new IllegalArgumentException("version must be a byte");
+        if (cryptVersions[defaultVersion] == null) throw new IllegalArgumentException("version " + defaultVersion + " is undefined");
+
+        this.defaultVersion = defaultVersion;
+        return this;
+    }
 
     @PostConstruct
     public void initReflection() {
@@ -67,6 +85,11 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
             List<Node> children = processDocument(entity.getType());
             if (!children.isEmpty()) encrypted.put(entity.getType(), new Node("", children, NodeType.ROOT));
         }
+    }
+
+    static {
+        // stupid JCE
+        JCEPolicy.allowUnlimitedStrength();
     }
 
     List<Node> processDocument(Class objectClass) {
@@ -106,7 +129,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
                 }
 
             } catch (Exception e) {
-                LOG.error("{}.{}", objectClass.getName(), field.getName(), e);
+                throw new IllegalArgumentException(objectClass.getName() + "." + field.getName(), e);
             }
         }
 
@@ -123,8 +146,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
             cryptFields(dbObject, node, new Decoder()::apply);
         } catch (Exception e) {
-            LOG.error("onAfterLoad", e);
-            throw e;
+            reThrow(e);
         }
     }
 
@@ -150,8 +172,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
             cryptFields(dbObject, node, new Encoder()::apply);
         } catch (Exception e) {
-            LOG.error("onBeforeSave", e);
-            throw e;
+            reThrow(e);
         }
     }
 
@@ -165,7 +186,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
                 serialized = encode(new BasicBSONObject("", o));
             }
 
-            return new Binary(encrypt(serialized));
+            return new Binary(encrypt(defaultVersion, serialized));
         }
     }
 
@@ -196,12 +217,12 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         }
     }
 
-    Cipher cipher() {
+    // FIXME: have a pool of ciphers (with locks & so), cipher init seems to be very costly (jmh it!)
+    Cipher cipher(String cipher) {
         try {
             return Cipher.getInstance(cipher);
         } catch (Exception e) {
-            LOG.error("spring-data-mongodb-encrypt: init failed for cipher {}", cipher, e);
-            return null;
+            throw new IllegalStateException("spring-data-mongodb-encrypt: init failed for cipher " + cipher, e);
         }
     }
 
@@ -218,27 +239,55 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         return bytes;
     }
 
-    byte[] encrypt(byte[] data) {
+    byte[] encrypt(int version, byte[] data) {
+        CryptVersion cryptVersion = cryptVersion(version);
         try {
-            byte[] random = urandomBytes(saltLength);
+            int cryptedLength = cryptVersion.encryptedLength.apply(data.length);
+            byte[] result = new byte[cryptedLength + cryptVersion.saltLength + 1];
+            result[0] = toSignedByte(version);
+
+            byte[] random = urandomBytes(cryptVersion.saltLength);
             IvParameterSpec iv_spec = new IvParameterSpec(random);
-            Cipher cipher = cipher();
-            cipher.init(Cipher.ENCRYPT_MODE, key, iv_spec);
-            return cipher.doFinal(data);
+            System.arraycopy(random, 0, result, 1, cryptVersion.saltLength);
+
+            Cipher cipher = cipher(cryptVersion.cipher);
+            cipher.init(Cipher.ENCRYPT_MODE, cryptVersion.key, iv_spec);
+            int len = cipher.doFinal(data, 0, data.length, result, cryptVersion.saltLength + 1);
+
+            // fixme remove
+            if (len != cryptedLength) System.err.println("len was "+len+" instead of "+cryptedLength);
+
+            return result;
         } catch (Exception e) {
-            LOG.error("encrypt failed", e);
-            return data;
+            return reThrow(e);
         }
     }
 
     byte[] decrypt(byte[] data) {
+        int version = fromSignedByte(data[0]);
+        CryptVersion cryptVersion = cryptVersion(version);
+
         try {
-            Cipher cipher = cipher();
-            cipher.init(Cipher.DECRYPT_MODE, key);
-            return cipher.doFinal(data);
+            byte[] random = new byte[cryptVersion.saltLength];
+            System.arraycopy(data, 1, random, 0, cryptVersion.saltLength);
+            IvParameterSpec iv_spec = new IvParameterSpec(random);
+
+            Cipher cipher = cipher(cryptVersions[version].cipher);
+            cipher.init(Cipher.DECRYPT_MODE, cryptVersions[version].key, iv_spec);
+            return cipher.doFinal(data, cryptVersion.saltLength + 1, data.length - cryptVersion.saltLength - 1);
         } catch (Exception e) {
-            LOG.error("decrypt failed", e);
-            return data;
+            return reThrow(e);
+        }
+    }
+
+    private CryptVersion cryptVersion(int version) {
+        try {
+            CryptVersion result = cryptVersions[version];
+            if (result == null) throw new IllegalArgumentException("version " + version + " undefined");
+            return result;
+        } catch (IndexOutOfBoundsException e) {
+            if (version < 0) throw new IllegalStateException("encryption keys are not initialized");
+            throw new IllegalArgumentException("version must be a byte (0-255)");
         }
     }
 
@@ -265,5 +314,18 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         MAP,
         /** field is a sub-document, descend */
         DOCUMENT
+    }
+
+    /** AES simply pads to next 128 bits & has to be at least 32 bytes long */
+    static final Function<Integer, Integer> AESLengthCalculator = i -> Math.max(i | 0xf, 32);
+
+    /** because, you know... java */
+    static byte toSignedByte(int val) {
+        return (byte) (val + Byte.MIN_VALUE);
+    }
+
+    /** because, you know... java */
+    static int fromSignedByte(byte val) {
+        return ((int) val - Byte.MIN_VALUE);
     }
 }
