@@ -1,5 +1,6 @@
 package com.bol.secure;
 
+import org.assertj.core.util.VisibleForTesting;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 public class MySubBean {
@@ -12,4 +13,11 @@ public class MySubBean {
     @Field
     @Encrypted
     public String secretString;
+
+    public MySubBean() {}
+
+    public MySubBean(String nonSensitiveData, String secretString) {
+        this.nonSensitiveData = nonSensitiveData;
+        this.secretString = secretString;
+    }
 }

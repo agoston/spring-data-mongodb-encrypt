@@ -1,6 +1,7 @@
 package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
@@ -63,9 +64,7 @@ public class EncryptSystemTest {
     @Test
     public void checkEncryptedSubdocument() {
         MyBean bean = new MyBean();
-        MySubBean subBean = new MySubBean();
-        subBean.nonSensitiveData = "sky is blue";
-        subBean.secretString = "   earth is round";
+        MySubBean subBean = new MySubBean("sky is blue", "   earth is round");
         bean.secretSubBean = subBean;
         mongoTemplate.save(bean);
 
@@ -86,9 +85,7 @@ public class EncryptSystemTest {
     @Test
     public void checkNonEncryptedSubdocument() {
         MyBean bean = new MyBean();
-        MySubBean subBean = new MySubBean();
-        subBean.nonSensitiveData = "sky is blue";
-        subBean.secretString = "   earth is round";
+        MySubBean subBean = new MySubBean("sky is blue", "   earth is round");
         bean.nonSensitiveSubBean = subBean;
         mongoTemplate.save(bean);
 
@@ -104,7 +101,37 @@ public class EncryptSystemTest {
         assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length());
     }
 
-    /** simplistic mongodb BSON serialization lengths:
+    @Test
+    public void checkNonEncryptedSubdocumentList() {
+        MyBean bean = new MyBean();
+        bean.nonSensitiveSubBeanList = Arrays.asList(
+                new MySubBean("sky is blue", "earth is round "),
+                new MySubBean(" grass is green ", " earth is cubic ")
+        );
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        for (int i = 0; i < bean.nonSensitiveSubBeanList.size(); i++) {
+            MySubBean subBean = bean.nonSensitiveSubBeanList.get(i);
+            MySubBean subDb = fromDb.nonSensitiveSubBeanList.get(i);
+            assertThat(subBean.secretString, is(subDb.secretString));
+            assertThat(subBean.nonSensitiveData, is(subDb.nonSensitiveData));
+        }
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        BasicDBList subMongo = (BasicDBList) fromMongo.get(MyBean.MONGO_NONSENSITIVESUBBEANLIST);
+
+        for (int i = 0; i < bean.nonSensitiveSubBeanList.size(); i++) {
+            BasicDBObject basicDBObject = (BasicDBObject) subMongo.get(i);
+            MySubBean subBean = bean.nonSensitiveSubBeanList.get(i);
+            assertThat(basicDBObject.get(MySubBean.MONGO_NONSENSITIVEDATA), is(subBean.nonSensitiveData));
+            assertCryptLength(basicDBObject.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
+        }
+    }
+
+    /**
+     * simplistic mongodb BSON serialization lengths:
      * - 10 bytes for wrapping BSONObject prefix
      * - 1 byte prefix before field name
      * - field name (1 byte/char)

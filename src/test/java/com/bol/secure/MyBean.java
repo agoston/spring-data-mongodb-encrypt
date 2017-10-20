@@ -12,6 +12,7 @@ public class MyBean {
     public static final String MONGO_MYBEAN = "mybean";
     public static final String MONGO_NONSENSITIVEDATA = "nonSensitiveData";
     public static final String MONGO_NONSENSITIVESUBBEAN = "nonSensitiveSubBean";
+    public static final String MONGO_NONSENSITIVESUBBEANLIST = "nonSensitiveSubBeanList";
     public static final String MONGO_SECRETSTRING = "secretString";
     public static final String MONGO_SECRETLONG = "secretLong";
     public static final String MONGO_SECRETBOOLEAN = "secretBoolean";
@@ -46,6 +47,9 @@ public class MyBean {
 
     @Field
     public MySubBean nonSensitiveSubBean;
+
+    @Field
+    public List<MySubBean> nonSensitiveSubBeanList;
 
     @Field
     @Version
