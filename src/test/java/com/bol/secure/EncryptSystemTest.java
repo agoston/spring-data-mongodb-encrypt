@@ -53,7 +53,7 @@ public class EncryptSystemTest {
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
         assertThat(fromMongo.get(MyBean.MONGO_NONSENSITIVEDATA), is(bean.nonSensitiveData));
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length());
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length() + 12);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
         // 12 is a magic constant that seems to be the overhead when serializing list of strings to BSON with mongo driver 3.4.2
@@ -98,7 +98,7 @@ public class EncryptSystemTest {
         DBObject subMongo = (DBObject) fromMongo.get(MyBean.MONGO_NONSENSITIVESUBBEAN);
 
         assertThat(subMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(subBean.nonSensitiveData));
-        assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length());
+        assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
     }
 
     @Test
@@ -140,6 +140,8 @@ public class EncryptSystemTest {
      * - field value (1byte/char)
      * - 1 byte 0-terminator after field value
      * - 2 bytes 0 terminator for wrapping BSONObject
+     *
+     * (for a single primitive string, 12 extra bytes are added above its own length)
      */
     public void assertCryptLength(Object cryptedSecret, int serializedLength) {
         assertThat(cryptedSecret, is(instanceOf(byte[].class)));
