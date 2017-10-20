@@ -130,6 +130,8 @@ public class EncryptSystemTest {
         }
     }
 
+    // fixme: test encryption map + readme
+
     /**
      * simplistic mongodb BSON serialization lengths:
      * - 10 bytes for wrapping BSONObject prefix

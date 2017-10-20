@@ -14,6 +14,7 @@ public class MySubBean {
     public String secretString;
 
     @Field
+    /** this would cause infinite recursion in reflectioncache */
     public MyBean recursiveBean;
 
     public MySubBean() {}

@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.util.List;
+import java.util.Map;
 
 @Document(collection = MyBean.MONGO_MYBEAN)
 public class MyBean {
@@ -50,6 +51,9 @@ public class MyBean {
 
     @Field
     public List<MySubBean> nonSensitiveSubBeanList;
+
+    @Field
+    public Map<String, MySubBean> publicMapWithSecretParts;
 
     @Field
     @Version
