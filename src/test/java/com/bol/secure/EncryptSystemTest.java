@@ -11,6 +11,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.instanceOf;
@@ -33,24 +36,35 @@ public class EncryptSystemTest {
     }
 
     @Test
-    public void checkEncryptAddress() {
+    public void checkEncryptPrimitives() {
         MyBean bean = new MyBean();
         bean.nonSensitiveData = "grass is green";
-        bean.secretData = "earth is flat     ";
+        bean.secretString = "earth is flat     ";
+        bean.secretLong = 95459L;
+        bean.secretBoolean = true;
+        bean.secretStringList = Arrays.asList("ear", "all", "I truly am a very very long string, oh yes, my kind sir");
         mongoTemplate.save(bean);
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
         assertThat(fromDb.nonSensitiveData, is(bean.nonSensitiveData));
-        assertThat(fromDb.secretData, is(bean.secretData));
+        assertThat(fromDb.secretString, is(bean.secretString));
+        assertThat(fromDb.secretLong, is(bean.secretLong));
+        assertThat(fromDb.secretBoolean, is(bean.secretBoolean));
+        assertThat(fromDb.secretStringList, is(bean.secretStringList));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        Object cryptedSecret = fromMongo.get(MyBean.MONGO_SECRETDATA);
-        assertThat(cryptedSecret, is(instanceOf(byte[].class)));
+        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length());
+        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
+        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
+        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), bean.secretStringList.stream().mapToInt(s -> s.length() + 11).sum());
+    }
 
+    public void assertCrypt(Object cryptedSecret, int serializedLength) {
+        assertThat(cryptedSecret, is(instanceOf(byte[].class)));
         byte[] cryptedBytes = (byte[]) cryptedSecret;
         CryptVersion cryptVersion = encryptionEventListener.cryptVersions[encryptionEventListener.defaultVersion];
-        int expectedLength = cryptVersion.saltLength + 1 + cryptVersion.encryptedLength.apply(bean.secretData.length());
+        int expectedLength = cryptVersion.saltLength + 1 + cryptVersion.encryptedLength.apply(serializedLength);
         assertThat(cryptedBytes.length, is(expectedLength));
     }
 
@@ -58,16 +72,16 @@ public class EncryptSystemTest {
     public void consecutiveEncryptsDifferentResults() {
         MyBean bean = new MyBean();
         bean.nonSensitiveData = "grass is green";
-        bean.secretData = "earth is flat";
+        bean.secretString = "earth is flat";
         mongoTemplate.save(bean);
 
         DBObject fromMongo1 = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        byte[] cryptedSecret1 = (byte[]) fromMongo1.get(MyBean.MONGO_SECRETDATA);
+        byte[] cryptedSecret1 = (byte[]) fromMongo1.get(MyBean.MONGO_SECRETSTRING);
 
         mongoTemplate.save(bean);
 
         DBObject fromMongo2 = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        byte[] cryptedSecret2 = (byte[]) fromMongo2.get(MyBean.MONGO_SECRETDATA);
+        byte[] cryptedSecret2 = (byte[]) fromMongo2.get(MyBean.MONGO_SECRETSTRING);
 
         assertThat(cryptedSecret1.length, is(cryptedSecret2.length));
         // version

@@ -251,8 +251,10 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
             cipher.init(Cipher.ENCRYPT_MODE, cryptVersion.key, iv_spec);
             int len = cipher.doFinal(data, 0, data.length, result, cryptVersion.saltLength + 1);
 
-            // fixme remove
-            if (len != cryptedLength) System.err.println("len was " + len + " instead of " + cryptedLength);
+            if (len < cryptedLength) {
+                // fixme: should use zerocopy dynamic buffer
+                System.err.println("len was " + len + " instead of " + cryptedLength);
+            }
 
             return result;
         } catch (Exception e) {
@@ -313,8 +315,8 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         DOCUMENT
     }
 
-    /** AES simply pads to next 128 bits & has to be at least 32 bytes long */
-    static final Function<Integer, Integer> AESLengthCalculator = i -> Math.max(i | 0xf, 32);
+    /** AES simply pads to 128 bits */
+    static final Function<Integer, Integer> AESLengthCalculator = i -> (i | 0xf) + 1;
 
     /** because, you know... java */
     static byte toSignedByte(int val) {

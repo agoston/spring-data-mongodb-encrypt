@@ -5,10 +5,16 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
+import java.util.List;
+
 @Document(collection = MyBean.MONGO_MYBEAN)
 public class MyBean {
     public static final String MONGO_MYBEAN = "mybean";
-    public static final String MONGO_SECRETDATA = "secretData";
+    public static final String MONGO_SECRETSTRING = "secretString";
+    public static final String MONGO_SECRETLONG = "secretLong";
+    public static final String MONGO_SECRETBOOLEAN = "secretBoolean";
+    public static final String MONGO_SECRETSUBBEAN = "secretSubBean";
+    public static final String MONGO_SECRETSTRINGLIST = "secretStringList";
 
     @Id
     public String id;
@@ -18,7 +24,23 @@ public class MyBean {
 
     @Field
     @Encrypted
-    public String secretData;
+    public String secretString;
+
+    @Field
+    @Encrypted
+    public Long secretLong;
+
+    @Field
+    @Encrypted
+    public Boolean secretBoolean;
+
+    @Field
+    @Encrypted
+    public MySubBean secretSubBean;
+
+    @Field
+    @Encrypted
+    public List<String> secretStringList;
 
     @Field
     @Version
