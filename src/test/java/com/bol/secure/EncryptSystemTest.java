@@ -83,7 +83,28 @@ public class EncryptSystemTest {
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSUBBEAN), expectedLength);
     }
 
-    /** mongodb BSON serialization lengths:
+    @Test
+    public void checkNonEncryptedSubdocument() {
+        MyBean bean = new MyBean();
+        MySubBean subBean = new MySubBean();
+        subBean.nonSensitiveData = "sky is blue";
+        subBean.secretString = "   earth is round";
+        bean.nonSensitiveSubBean = subBean;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.nonSensitiveSubBean.nonSensitiveData, is(bean.nonSensitiveSubBean.nonSensitiveData));
+        assertThat(fromDb.nonSensitiveSubBean.secretString, is(bean.nonSensitiveSubBean.secretString));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        DBObject subMongo = (DBObject) fromMongo.get(MyBean.MONGO_NONSENSITIVESUBBEAN);
+
+        assertThat(subMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(subBean.nonSensitiveData));
+        assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length());
+    }
+
+    /** simplistic mongodb BSON serialization lengths:
      * - 10 bytes for wrapping BSONObject prefix
      * - 1 byte prefix before field name
      * - field name (1 byte/char)

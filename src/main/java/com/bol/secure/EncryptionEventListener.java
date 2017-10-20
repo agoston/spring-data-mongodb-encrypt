@@ -5,7 +5,6 @@ import com.bol.reflection.Node;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
-import com.mongodb.DefaultDBDecoder;
 import org.bson.*;
 import org.bson.types.Binary;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,11 +102,9 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
     private class Encoder extends BasicBSONEncoder implements Function<Object, Object> {
         public Object apply(Object o) {
-            byte[] serialized;
-
-            // fixme: painful, but we need to put even BSONObject and BSONList in a wrapping object before serialization, otherwise the type information is not encoded. luckily this is a few bytes extra only.
-            serialized = encode(new BasicBSONObject("", o));
-
+            // we need to put even BSONObject and BSONList in a wrapping object before serialization, otherwise the type information is not encoded.
+            // this is not particularly effective, however, it is the same that mongo driver itself uses on the wire, so it has 100% compatibility w.r.t de/serialization
+            byte[] serialized = encode(new BasicBSONObject("", o));
             return new Binary(cryptVault.encrypt(serialized));
         }
     }
