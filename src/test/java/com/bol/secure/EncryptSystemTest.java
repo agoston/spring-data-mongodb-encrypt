@@ -1,5 +1,7 @@
 package com.bol.secure;
 
+import com.bol.crypt.CryptVault;
+import com.bol.crypt.CryptVersion;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
@@ -11,7 +13,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 
 import static org.hamcrest.Matchers.not;
@@ -28,7 +29,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 public class EncryptSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;
-    @Autowired EncryptionEventListener encryptionEventListener;
+    @Autowired CryptVault cryptVault;
 
     @Before
     public void cleanDb() {
@@ -63,9 +64,7 @@ public class EncryptSystemTest {
     public void assertCrypt(Object cryptedSecret, int serializedLength) {
         assertThat(cryptedSecret, is(instanceOf(byte[].class)));
         byte[] cryptedBytes = (byte[]) cryptedSecret;
-        CryptVersion cryptVersion = encryptionEventListener.cryptVersions[encryptionEventListener.defaultVersion];
-        int expectedLength = cryptVersion.saltLength + 1 + cryptVersion.encryptedLength.apply(serializedLength);
-        assertThat(cryptedBytes.length, is(expectedLength));
+        assertThat(cryptedBytes.length, is(cryptVault.expectedCryptedLength(serializedLength)));
     }
 
     @Test

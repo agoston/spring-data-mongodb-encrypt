@@ -1,5 +1,7 @@
 package com.bol.secure;
 
+import com.bol.crypt.CryptVault;
+import com.bol.util.JCEPolicy;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
@@ -14,17 +16,11 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventListener;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
-import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.annotation.PostConstruct;
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
-import java.security.Key;
-import java.security.SecureRandom;
 import java.util.*;
 import java.util.function.Function;
 
@@ -33,45 +29,14 @@ import static com.bol.util.Thrower.reThrow;
 public class EncryptionEventListener extends AbstractMongoEventListener {
     static final String MAP_FIELD_MATCHER = "*";
 
-    static final String DEFAULT_CIPHER = "AES/CBC/PKCS5Padding";
-    static final String DEFAULT_ALGORITHM = "AES";
-    static final int DEFAULT_SALT_LENGTH = 16;
-
-    CryptVersion[] cryptVersions = new CryptVersion[256];
-    int defaultVersion = -1;
-
     Map<Class, Node> encrypted;
 
     @Autowired MongoMappingContext mappingContext;
 
-    /**
-     * Helper method for the most used case.
-     * If you even need to change this, or need backwards compatibility, use the more advanced constructor instead.
-     */
-    public EncryptionEventListener with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(int version, byte[] secret) {
-        if (secret.length != 32) throw new IllegalArgumentException("invalid AES key size; should be 256 bits!");
+    CryptVault cryptVault;
 
-        Key key = new SecretKeySpec(secret, DEFAULT_ALGORITHM);
-        CryptVersion cryptVersion = new CryptVersion(DEFAULT_SALT_LENGTH, DEFAULT_CIPHER, key, AESLengthCalculator);
-        return withKey(version, cryptVersion);
-    }
-
-    public EncryptionEventListener withKey(int version, CryptVersion cryptVersion) {
-        if (version < 0 || version > 255) throw new IllegalArgumentException("version must be a byte");
-        if (cryptVersions[version] != null) throw new IllegalArgumentException("version " + version + " is already defined");
-
-        cryptVersions[version] = cryptVersion;
-        if (version > defaultVersion) defaultVersion = version;
-        return this;
-    }
-
-    /** specifies the version used in encrypting new data. default is highest version number. */
-    public EncryptionEventListener withDefaultKeyVersion(int defaultVersion) {
-        if (defaultVersion < 0 || defaultVersion > 255) throw new IllegalArgumentException("version must be a byte");
-        if (cryptVersions[defaultVersion] == null) throw new IllegalArgumentException("version " + defaultVersion + " is undefined");
-
-        this.defaultVersion = defaultVersion;
-        return this;
+    public EncryptionEventListener(CryptVault cryptVault) {
+        this.cryptVault = cryptVault;
     }
 
     @PostConstruct
@@ -82,11 +47,6 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
             List<Node> children = processDocument(entity.getType());
             if (!children.isEmpty()) encrypted.put(entity.getType(), new Node("", children, NodeType.ROOT));
         }
-    }
-
-    static {
-        // stupid JCE
-        JCEPolicy.allowUnlimitedStrength();
     }
 
     List<Node> processDocument(Class objectClass) {
@@ -149,7 +109,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
     private class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
         public Object apply(Object o) {
-            byte[] serialized = decrypt((byte[]) o);
+            byte[] serialized = cryptVault.decrypt((byte[]) o);
             BSONObject bsonObject = readObject(serialized);
             Set<String> keys = bsonObject.keySet();
             if (keys.size() == 1 && keys.iterator().next().length() == 0) {
@@ -183,7 +143,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
                 serialized = encode(new BasicBSONObject("", o));
             }
 
-            return new Binary(encrypt(defaultVersion, serialized));
+            return new Binary(cryptVault.encrypt(serialized));
         }
     }
 
@@ -214,82 +174,6 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         }
     }
 
-    // FIXME: have a pool of ciphers (with locks & so), cipher init seems to be very costly (jmh it!)
-    Cipher cipher(String cipher) {
-        try {
-            return Cipher.getInstance(cipher);
-        } catch (Exception e) {
-            throw new IllegalStateException("spring-data-mongodb-encrypt: init failed for cipher " + cipher, e);
-        }
-    }
-
-    public SecureRandom SECURE_RANDOM = new SecureRandom();
-
-    @Scheduled(initialDelay = 3_600_000, fixedDelay = 3_600_000)
-    public void reinitSecureRandomHourly() {
-        SECURE_RANDOM = new SecureRandom();
-    }
-
-    byte[] urandomBytes(int numBytes) {
-        byte[] bytes = new byte[numBytes];
-        SECURE_RANDOM.nextBytes(bytes);
-        return bytes;
-    }
-
-    byte[] encrypt(int version, byte[] data) {
-        CryptVersion cryptVersion = cryptVersion(version);
-        try {
-            int cryptedLength = cryptVersion.encryptedLength.apply(data.length);
-            byte[] result = new byte[cryptedLength + cryptVersion.saltLength + 1];
-            result[0] = toSignedByte(version);
-
-            byte[] random = urandomBytes(cryptVersion.saltLength);
-            IvParameterSpec iv_spec = new IvParameterSpec(random);
-            System.arraycopy(random, 0, result, 1, cryptVersion.saltLength);
-
-            Cipher cipher = cipher(cryptVersion.cipher);
-            cipher.init(Cipher.ENCRYPT_MODE, cryptVersion.key, iv_spec);
-            int len = cipher.doFinal(data, 0, data.length, result, cryptVersion.saltLength + 1);
-
-            if (len < cryptedLength) {
-                // fixme: should use zerocopy dynamic buffer
-                System.err.println("len was " + len + " instead of " + cryptedLength);
-            }
-
-            return result;
-        } catch (Exception e) {
-            return reThrow(e);
-        }
-    }
-
-    byte[] decrypt(byte[] data) {
-        int version = fromSignedByte(data[0]);
-        CryptVersion cryptVersion = cryptVersion(version);
-
-        try {
-            byte[] random = new byte[cryptVersion.saltLength];
-            System.arraycopy(data, 1, random, 0, cryptVersion.saltLength);
-            IvParameterSpec iv_spec = new IvParameterSpec(random);
-
-            Cipher cipher = cipher(cryptVersions[version].cipher);
-            cipher.init(Cipher.DECRYPT_MODE, cryptVersions[version].key, iv_spec);
-            return cipher.doFinal(data, cryptVersion.saltLength + 1, data.length - cryptVersion.saltLength - 1);
-        } catch (Exception e) {
-            return reThrow(e);
-        }
-    }
-
-    private CryptVersion cryptVersion(int version) {
-        try {
-            CryptVersion result = cryptVersions[version];
-            if (result == null) throw new IllegalArgumentException("version " + version + " undefined");
-            return result;
-        } catch (IndexOutOfBoundsException e) {
-            if (version < 0) throw new IllegalStateException("encryption keys are not initialized");
-            throw new IllegalArgumentException("version must be a byte (0-255)");
-        }
-    }
-
     class Node {
         public final String fieldName;
         public final List<Node> children;
@@ -315,16 +199,8 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         DOCUMENT
     }
 
-    /** AES simply pads to 128 bits */
-    static final Function<Integer, Integer> AESLengthCalculator = i -> (i | 0xf) + 1;
-
-    /** because, you know... java */
-    static byte toSignedByte(int val) {
-        return (byte) (val + Byte.MIN_VALUE);
-    }
-
-    /** because, you know... java */
-    static int fromSignedByte(byte val) {
-        return ((int) val - Byte.MIN_VALUE);
+    static {
+        // stupid JCE
+        JCEPolicy.allowUnlimitedStrength();
     }
 }

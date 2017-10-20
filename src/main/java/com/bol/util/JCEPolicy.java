@@ -1,4 +1,4 @@
-package com.bol.secure;
+package com.bol.util;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.bol.util.Thrower.reThrow;
 
-final class JCEPolicy {
+public final class JCEPolicy {
 
     private static final AtomicBoolean allow = new AtomicBoolean(false);
 
@@ -14,7 +14,7 @@ final class JCEPolicy {
         // ...
     }
 
-    static void allowUnlimitedStrength() {
+    public static void allowUnlimitedStrength() {
         if (!allow.compareAndSet(false, true)) {
             return;
         }

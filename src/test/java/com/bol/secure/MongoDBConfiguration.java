@@ -1,5 +1,6 @@
 package com.bol.secure;
 
+import com.bol.crypt.CryptVault;
 import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import org.springframework.context.annotation.Bean;
@@ -25,9 +26,14 @@ public class MongoDBConfiguration extends AbstractMongoConfiguration {
     }
 
     @Bean
-    public EncryptionEventListener encryptionEventListener() {
-        return new EncryptionEventListener()
+    public CryptVault cryptVault() {
+        return new CryptVault()
                 .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, secretKey)
                 .withDefaultKeyVersion(0);
+    }
+
+    @Bean
+    public EncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
+        return new EncryptionEventListener(cryptVault);
     }
 }
