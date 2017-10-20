@@ -1,5 +1,6 @@
 package com.bol.crypt;
 
+import com.bol.util.JCEPolicy;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.crypto.Cipher;
@@ -147,5 +148,10 @@ public class CryptVault {
     /** because, you know... java */
     static int fromSignedByte(byte val) {
         return ((int) val - Byte.MIN_VALUE);
+    }
+
+    static {
+        // stupid JCE
+        JCEPolicy.allowUnlimitedStrength();
     }
 }

@@ -10,6 +10,8 @@ import java.util.List;
 @Document(collection = MyBean.MONGO_MYBEAN)
 public class MyBean {
     public static final String MONGO_MYBEAN = "mybean";
+    public static final String MONGO_NONSENSITIVEDATA = "nonSensitiveData";
+    public static final String MONGO_NONSENSITIVESUBBEAN = "nonSensitiveSubBean";
     public static final String MONGO_SECRETSTRING = "secretString";
     public static final String MONGO_SECRETLONG = "secretLong";
     public static final String MONGO_SECRETBOOLEAN = "secretBoolean";
@@ -41,6 +43,9 @@ public class MyBean {
     @Field
     @Encrypted
     public List<String> secretStringList;
+
+    @Field
+    public MySubBean nonSensitiveSubBean;
 
     @Field
     @Version

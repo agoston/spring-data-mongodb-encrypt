@@ -7,6 +7,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
+// fixme: unit test for preparing the model via reflection
 public class ReflectionCache {
     public static List<Node> processDocument(Class objectClass) {
         List<Node> nodes = new ArrayList<>();

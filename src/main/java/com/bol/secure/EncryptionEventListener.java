@@ -2,27 +2,22 @@ package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
 import com.bol.reflection.Node;
-import com.bol.util.JCEPolicy;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
-import org.bson.BSONObject;
-import org.bson.BasicBSONDecoder;
-import org.bson.BasicBSONEncoder;
-import org.bson.BasicBSONObject;
+import com.mongodb.DefaultDBDecoder;
+import org.bson.*;
 import org.bson.types.Binary;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.mapping.BasicMongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventListener;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 
 import javax.annotation.PostConstruct;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import static com.bol.reflection.ReflectionCache.processDocument;
@@ -67,12 +62,28 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
     private class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
         public Object apply(Object o) {
             byte[] serialized = cryptVault.decrypt((byte[]) o);
-            BSONObject bsonObject = readObject(serialized);
-            Set<String> keys = bsonObject.keySet();
-            if (keys.size() == 1 && keys.iterator().next().length() == 0) {
-                return bsonObject.get("");
-            }
-            return bsonObject;
+            BSONCallback bsonCallback = new BasicDBObjectCallback();
+            decode(serialized, bsonCallback);
+            BSONObject deserialized = (BSONObject) bsonCallback.get();
+            return deserialized.get("");
+        }
+    }
+
+    /** BasicBSONEncoder returns BasicBSONObject which makes mongotemplate converter choke :( */
+    private class BasicDBObjectCallback extends BasicBSONCallback {
+        @Override
+        public BSONObject create() {
+            return new BasicDBObject();
+        }
+
+        @Override
+        protected BSONObject createList() {
+            return new BasicDBList();
+        }
+
+        @Override
+        public BSONCallback createBSONCallback() {
+            return new BasicDBObjectCallback();
         }
     }
 
@@ -94,11 +105,8 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         public Object apply(Object o) {
             byte[] serialized;
 
-            if (o instanceof BSONObject) {
-                serialized = encode((BSONObject) o);
-            } else {
-                serialized = encode(new BasicBSONObject("", o));
-            }
+            // fixme: painful, but we need to put even BSONObject and BSONList in a wrapping object before serialization, otherwise the type information is not encoded. luckily this is a few bytes extra only.
+            serialized = encode(new BasicBSONObject("", o));
 
             return new Binary(cryptVault.encrypt(serialized));
         }
@@ -129,10 +137,5 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
             dbObject.put(childNode.fieldName, crypt.apply(value));
         }
-    }
-
-    static {
-        // stupid JCE
-        JCEPolicy.allowUnlimitedStrength();
     }
 }

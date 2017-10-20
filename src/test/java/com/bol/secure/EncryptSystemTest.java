@@ -1,7 +1,6 @@
 package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
-import com.bol.crypt.CryptVersion;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
@@ -15,10 +14,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Arrays;
 
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
@@ -55,13 +51,40 @@ public class EncryptSystemTest {
         assertThat(fromDb.secretStringList, is(bean.secretStringList));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length());
-        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
-        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
-        assertCrypt(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), bean.secretStringList.stream().mapToInt(s -> s.length() + 11).sum());
+        assertThat(fromMongo.get(MyBean.MONGO_NONSENSITIVEDATA), is(bean.nonSensitiveData));
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length());
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
+        // 12 is a magic constant that seems to be the overhead when serializing list of strings to BSON with mongo driver 3.4.2
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), bean.secretStringList.stream().mapToInt(s -> s.length() + 12).sum());
     }
 
-    public void assertCrypt(Object cryptedSecret, int serializedLength) {
+    @Test
+    public void checkEncryptedSubdocument() {
+        MyBean bean = new MyBean();
+        MySubBean subBean = new MySubBean();
+        subBean.nonSensitiveData = "sky is blue";
+        subBean.secretString = "   earth is round";
+        bean.secretSubBean = subBean;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.secretSubBean.nonSensitiveData, is(bean.secretSubBean.nonSensitiveData));
+        assertThat(fromDb.secretSubBean.secretString, is(bean.secretSubBean.secretString));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+
+        // when serializing documents, they include the field names as well
+        int expectedLength = MySubBean.MONGO_NONSENSITIVEDATA.length() + 8
+                + subBean.secretString.length() + 8
+                + MySubBean.MONGO_SECRETSTRING.length() + 8
+                + subBean.nonSensitiveData.length() + 8;
+
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSUBBEAN), expectedLength);
+    }
+
+    public void assertCryptLength(Object cryptedSecret, int serializedLength) {
         assertThat(cryptedSecret, is(instanceOf(byte[].class)));
         byte[] cryptedBytes = (byte[]) cryptedSecret;
         assertThat(cryptedBytes.length, is(cryptVault.expectedCryptedLength(serializedLength)));
@@ -94,8 +117,4 @@ public class EncryptSystemTest {
 
         assertThat("crypted fields look too much alike", equals, is(not(greaterThan(cryptedSecret1.length / 10))));
     }
-
-    // fixme: unit test for preparing the model via reflection
-    // fixme: explode code into smaller parts/classes
-
 }
