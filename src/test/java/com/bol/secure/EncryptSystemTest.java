@@ -56,7 +56,8 @@ public class EncryptSystemTest {
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
         // 12 is a magic constant that seems to be the overhead when serializing list of strings to BSON with mongo driver 3.4.2
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), bean.secretStringList.stream().mapToInt(s -> s.length() + 12).sum());
+        int expectedLength = 12 + bean.secretStringList.stream().mapToInt(s -> s.length() + 8).sum();
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), expectedLength);
     }
 
     @Test
@@ -75,19 +76,29 @@ public class EncryptSystemTest {
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
 
-        // when serializing documents, they include the field names as well
-        int expectedLength = MySubBean.MONGO_NONSENSITIVEDATA.length() + 8
-                + subBean.secretString.length() + 8
-                + MySubBean.MONGO_SECRETSTRING.length() + 8
-                + subBean.nonSensitiveData.length() + 8;
+        int expectedLength = 12
+                + MySubBean.MONGO_NONSENSITIVEDATA.length() + subBean.secretString.length() + 7
+                + MySubBean.MONGO_SECRETSTRING.length() + subBean.nonSensitiveData.length() + 7;
 
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSUBBEAN), expectedLength);
     }
 
+    /** mongodb BSON serialization lengths:
+     * - 10 bytes for wrapping BSONObject prefix
+     * - 1 byte prefix before field name
+     * - field name (1 byte/char)
+     * - 1 byte 0-terminator after field name
+     * - 4 byte prefix before field value
+     * - field value (1byte/char)
+     * - 1 byte 0-terminator after field value
+     * - 2 bytes 0 terminator for wrapping BSONObject
+     */
     public void assertCryptLength(Object cryptedSecret, int serializedLength) {
         assertThat(cryptedSecret, is(instanceOf(byte[].class)));
         byte[] cryptedBytes = (byte[]) cryptedSecret;
-        assertThat(cryptedBytes.length, is(cryptVault.expectedCryptedLength(serializedLength)));
+
+        int expectedCryptedLength = cryptVault.expectedCryptedLength(serializedLength);
+        assertThat(cryptedBytes.length, is(expectedCryptedLength));
     }
 
     @Test
