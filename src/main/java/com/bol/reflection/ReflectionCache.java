@@ -1,6 +1,8 @@
 package com.bol.reflection;
 
 import com.bol.secure.Encrypted;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -9,8 +11,23 @@ import java.util.*;
 
 // fixme: unit test for preparing the model via reflection
 public class ReflectionCache {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);
+
     public static List<Node> processDocument(Class objectClass) {
+        return processDocument(objectClass, new ArrayDeque<>());
+    }
+
+    static List<Node> processDocument(Class objectClass, Deque<Class> deque) {
         List<Node> nodes = new ArrayList<>();
+
+        if (deque.contains(objectClass)) {
+            LOG.error("cyclic reference found; " + objectClass.getName() + " is already mapped via " + deque.stream().map(s -> s.getName()));
+            return nodes;
+        }
+
+        deque.addLast(objectClass);
+
         for (Field field : objectClass.getDeclaredFields()) {
             try {
                 if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) continue;
@@ -25,7 +42,7 @@ public class ReflectionCache {
                     ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
                     Class<?> genericClass = (Class<?>) parameterizedType.getActualTypeArguments()[0];
 
-                    List<Node> children = processDocument(genericClass);
+                    List<Node> children = processDocument(genericClass, deque);
                     if (!children.isEmpty()) nodes.add(new Node(field.getName(), children, Node.Type.LIST));
 
                 } else if (Map.class.isAssignableFrom(field.getType())) {
@@ -33,7 +50,7 @@ public class ReflectionCache {
                     ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
                     Class<?> genericClass = (Class<?>) parameterizedType.getActualTypeArguments()[1];
 
-                    List<Node> children = processDocument(genericClass);
+                    List<Node> children = processDocument(genericClass, deque);
                     if (!children.isEmpty()) {
                         List<Node> mapKeys = Collections.singletonList(new Node("*", children, Node.Type.DOCUMENT));
                         nodes.add(new Node(field.getName(), mapKeys, Node.Type.MAP));
@@ -41,7 +58,7 @@ public class ReflectionCache {
 
                 } else {
                     // descending into sub-documents
-                    List<Node> children = processDocument(field.getType());
+                    List<Node> children = processDocument(field.getType(), deque);
                     if (!children.isEmpty()) nodes.add(new Node(field.getName(), children, Node.Type.DOCUMENT));
                 }
 
@@ -49,6 +66,7 @@ public class ReflectionCache {
                 throw new IllegalArgumentException(objectClass.getName() + "." + field.getName(), e);
             }
         }
+        deque.removeLast();
 
         return nodes;
     }
