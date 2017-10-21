@@ -1,6 +1,9 @@
 package com.bol.crypt;
 
+import com.bol.reflection.ReflectionCache;
 import com.bol.util.JCEPolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.crypto.Cipher;
@@ -13,6 +16,8 @@ import java.util.function.Function;
 import static com.bol.util.Thrower.reThrow;
 
 public class CryptVault {
+    private static final Logger LOG = LoggerFactory.getLogger(CryptVault.class);
+
     static final String DEFAULT_CIPHER = "AES/CBC/PKCS5Padding";
     static final String DEFAULT_ALGORITHM = "AES";
     static final int DEFAULT_SALT_LENGTH = 16;
@@ -91,8 +96,7 @@ public class CryptVault {
             cipher.init(Cipher.ENCRYPT_MODE, cryptVersion.key, iv_spec);
             int len = cipher.doFinal(data, 0, data.length, result, cryptVersion.saltLength + 1);
 
-            // fixme: remove this once system tests pass
-            if (len < cryptedLength) System.err.println("len was " + len + " instead of " + cryptedLength);
+            if (len < cryptedLength) LOG.info("len was " + len + " instead of " + cryptedLength);
 
             return result;
         } catch (Exception e) {

@@ -14,6 +14,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
@@ -130,7 +132,61 @@ public class EncryptSystemTest {
         }
     }
 
-    // fixme: test encryption map + readme
+    @Test
+    public void checkNonEncryptedMap() {
+        MyBean bean = new MyBean();
+        Map<String, MySubBean> map = new HashMap();
+        map.put("one", new MySubBean("sky is blue", "                 earth is round"));
+        map.put("two", new MySubBean("grass is green", "earth is flat"));
+        bean.nonSensitiveMap = map;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.nonSensitiveMap.get("one").secretString, is(bean.nonSensitiveMap.get("one").secretString));
+        assertThat(fromDb.nonSensitiveMap.get("one").nonSensitiveData, is(bean.nonSensitiveMap.get("one").nonSensitiveData));
+        assertThat(fromDb.nonSensitiveMap.get("two").secretString, is(bean.nonSensitiveMap.get("two").secretString));
+        assertThat(fromDb.nonSensitiveMap.get("two").nonSensitiveData, is(bean.nonSensitiveMap.get("two").nonSensitiveData));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        DBObject mapMongo = (DBObject) fromMongo.get(MyBean.MONGO_NONSENSITIVEMAP);
+        DBObject oneMongo = (DBObject) mapMongo.get("one");
+        DBObject twoMongo = (DBObject) mapMongo.get("two");
+
+        assertThat(oneMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(map.get("one").nonSensitiveData));
+        assertThat(twoMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(map.get("two").nonSensitiveData));
+        assertCryptLength(oneMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("one").secretString.length() + 12);
+        assertCryptLength(twoMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("two").secretString.length() + 12);
+    }
+
+    @Test
+    public void checkEncryptedMap() {
+        MyBean bean = new MyBean();
+        Map<String, MySubBean> map = new HashMap();
+        map.put("one", new MySubBean("sky is blue", "                 earth is round"));
+        map.put("two", new MySubBean("grass is green", "earth is flat"));
+        bean.secretMap = map;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.secretMap.get("one").secretString, is(bean.secretMap.get("one").secretString));
+        assertThat(fromDb.secretMap.get("one").nonSensitiveData, is(bean.secretMap.get("one").nonSensitiveData));
+        assertThat(fromDb.secretMap.get("two").secretString, is(bean.secretMap.get("two").secretString));
+        assertThat(fromDb.secretMap.get("two").nonSensitiveData, is(bean.secretMap.get("two").nonSensitiveData));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+
+        int expectedLength = 12
+                + "one".length() + 7
+                + "two".length() + 7
+                + MySubBean.MONGO_NONSENSITIVEDATA.length() + map.get("one").secretString.length() + 7
+                + MySubBean.MONGO_SECRETSTRING.length() + map.get("one").nonSensitiveData.length() + 7
+                + MySubBean.MONGO_NONSENSITIVEDATA.length() + map.get("two").secretString.length() + 7
+                + MySubBean.MONGO_SECRETSTRING.length() + map.get("two").nonSensitiveData.length() + 7;
+
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETMAP), expectedLength);
+    }
 
     /**
      * simplistic mongodb BSON serialization lengths:

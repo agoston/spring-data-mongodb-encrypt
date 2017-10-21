@@ -19,6 +19,8 @@ public class MyBean {
     public static final String MONGO_SECRETBOOLEAN = "secretBoolean";
     public static final String MONGO_SECRETSUBBEAN = "secretSubBean";
     public static final String MONGO_SECRETSTRINGLIST = "secretStringList";
+    public static final String MONGO_NONSENSITIVEMAP = "nonSensitiveMap";
+    public static final String MONGO_SECRETMAP = "secretMap";
 
     @Id
     public String id;
@@ -53,7 +55,11 @@ public class MyBean {
     public List<MySubBean> nonSensitiveSubBeanList;
 
     @Field
-    public Map<String, MySubBean> publicMapWithSecretParts;
+    public Map<String, MySubBean> nonSensitiveMap;
+
+    @Field
+    @Encrypted
+    public Map<String, MySubBean> secretMap;
 
     @Field
     @Version
