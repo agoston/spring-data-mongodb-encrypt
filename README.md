@@ -6,10 +6,10 @@ Features
 
 - integrates transparently into `spring-data-mongo`
 - supports sub-documents
-- supports List, Map fields
+- supports List, Map @Fields and nested beans
 - high performance encryption
 - high performance operation (no reflection at runtime)
-- key versioning (to help migrating to new key without downtime)
+- key versioning (to help migrating to new key without need to convert data)
 - supports 256-bit AES out of the box
 - supports any encryption available in Java (JCE)
 - simple (500 lines of code)
