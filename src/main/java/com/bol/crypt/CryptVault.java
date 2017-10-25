@@ -1,6 +1,5 @@
 package com.bol.crypt;
 
-import com.bol.reflection.ReflectionCache;
 import com.bol.util.JCEPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -8,6 +8,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
+import java.util.stream.Collectors;
 
 // fixme: unit test for preparing the model via reflection
 public class ReflectionCache {
@@ -22,7 +23,7 @@ public class ReflectionCache {
         List<Node> nodes = new ArrayList<>();
 
         if (deque.contains(objectClass)) {
-            LOG.error("cyclic reference found; " + objectClass.getName() + " is already mapped via " + deque.stream().map(s -> s.getName()));
+            LOG.error("cyclic reference found; " + objectClass.getName() + " is already mapped via " + deque.stream().map(s -> s.getName()).collect(Collectors.toList()));
             return nodes;
         }
 
