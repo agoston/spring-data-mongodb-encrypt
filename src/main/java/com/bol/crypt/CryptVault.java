@@ -141,6 +141,15 @@ public class CryptVault {
         }
     }
 
+    /** amount of keys defined in this CryptVault */
+    public int size() {
+        int size = 0;
+        for (int i = 0; i < cryptVersions.length; i++) {
+            if (cryptVersions[i] != null) size++;
+        }
+        return size;
+    }
+
     /** AES simply pads to 128 bits */
     static final Function<Integer, Integer> AESLengthCalculator = i -> (i | 0xf) + 1;
 
