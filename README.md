@@ -24,7 +24,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>1.0</version>
+            <version>1.0.1</version>
         </dependency>
 ```
 
