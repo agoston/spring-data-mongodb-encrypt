@@ -34,7 +34,9 @@ Configure spring:
 @Configuration
 public class MongoDBConfiguration extends AbstractMongoConfiguration {
 
+    // normally you would use @Value to wire a property here
     private static final byte[] secretKey = Base64.getDecoder().decode("hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=");
+    private static final byte[] oldKey = Base64.getDecoder().decode("cUzurmCcL+K252XDJhhWI/A/+wxYXLgIm678bwsE2QM=");
 
     @Override
     protected String getDatabaseName() {
@@ -50,8 +52,10 @@ public class MongoDBConfiguration extends AbstractMongoConfiguration {
     @Bean
     public CryptVault cryptVault() {
         return new CryptVault()
-                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, secretKey)
-                .withDefaultKeyVersion(0);
+                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, oldKey)
+                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(1, secretKey)
+                // can be omitted if it's the highest version
+                .withDefaultKeyVersion(1);
     }
 
     @Bean
@@ -133,4 +137,52 @@ The result in mongodb:
 		}
 	]
 }
+```
+
+Encrypt other data
+------------------
+
+If you want to encrypt other arbitrary data, here is an example on how to do so:
+
+```java
+
+    @Autowired CryptVault cryptVault;
+
+    // encrypt
+    byte[] encrypted = cryptVault.encrypt("rock".getBytes());
+
+    // decrypt
+    byte[] decrypted = cryptVault.decrypt(encrypted);
+    
+    new String(decrypted).equals("rock");   // true 
+```
+
+If you want to use this library to encrypt arbitrary fields directly via mongo-driver:
+
+```java
+    @Autowired MongoTemplate mongoTemplate;
+    @Autowired CryptVault cryptVault;
+
+    void store(String id, String secretData) {
+        byte[] bytes = secretData.getBytes();
+        byte[] encrypted = cryptVault.encrypt(bytes);
+        Binary binary = new Binary(encrypted);
+
+        BasicDBObject dbObject = new BasicDBObject("_id", id);
+        dbObject.put("blob", binary);
+
+        mongoTemplate.getCollection("blobs").save(dbObject);
+    }
+
+    String load(String id) {
+        DBObject result = mongoTemplate.getCollection("blobs").findOne(id);
+        if (result == null) return "";
+
+        Object blob = result.get("blob");
+        if (blob == null) return "";
+
+        byte[] encrypted = (byte[]) blob;
+        byte[] decrypted = cryptVault.decrypt(encrypted);
+        return new String(decrypted);
+    }
 ```
