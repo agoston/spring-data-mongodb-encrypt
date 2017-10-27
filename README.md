@@ -4,7 +4,7 @@ spring-data-mongodb-encrypt - @Field @Encrypted
 Features
 --------
 
-- integrates transparently into `spring-data-mongo`
+- integrates transparently into `spring-data-mongodb`
 - supports sub-documents
 - supports List, Map @Fields and nested beans
 - high performance encryption
