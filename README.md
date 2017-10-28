@@ -16,6 +16,7 @@ Features
 - supports any encryption available in Java (JCE)
 - simple (500 lines of code)
 - tested throughly
+- 0 dependencies
 
 For the impatient
 -----------------
