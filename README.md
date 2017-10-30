@@ -1,3 +1,5 @@
+[![Maven Central](https://img.shields.io/maven-central/v/com.bol/spring-data-mongodb-encrypt.svg)](http://search.maven.org/#search%7Cga%7C1%7Ccom.bol)
+
 spring-data-mongodb-encrypt
 ---------------------------
 
