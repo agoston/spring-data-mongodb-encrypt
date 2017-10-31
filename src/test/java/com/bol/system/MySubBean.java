@@ -1,5 +1,6 @@
-package com.bol.secure;
+package com.bol.system;
 
+import com.bol.secure.Encrypted;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 public class MySubBean {

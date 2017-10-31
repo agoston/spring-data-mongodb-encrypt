@@ -1,4 +1,4 @@
-package com.bol.secure;
+package com.bol.system;
 
 import com.bol.crypt.CryptVault;
 import com.mongodb.BasicDBList;

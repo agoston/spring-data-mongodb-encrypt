@@ -1,5 +1,6 @@
-package com.bol.secure;
+package com.bol.system;
 
+import com.bol.secure.Encrypted;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
