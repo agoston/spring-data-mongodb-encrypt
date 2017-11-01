@@ -19,7 +19,7 @@
     </licenses>
 
     <scm>
-        <url>https://github.com/agoston/spring-data-mongodb-encrypt</url>
+        <url>https://github.com/bolcom/spring-data-mongodb-encrypt</url>
     </scm>
 
     <developers>
