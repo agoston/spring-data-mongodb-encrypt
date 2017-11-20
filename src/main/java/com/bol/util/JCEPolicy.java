@@ -1,12 +1,20 @@
 package com.bol.util;
 
+import com.bol.crypt.CryptVault;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.bol.util.Thrower.reThrow;
-
+/**
+ * This is no longer required in java8, u162. see:
+ * https://bugs.openjdk.java.net/browse/JDK-8170157
+ */
+@Deprecated
 public final class JCEPolicy {
+    private static final Logger LOG = LoggerFactory.getLogger(CryptVault.class);
 
     private static final AtomicBoolean allow = new AtomicBoolean(false);
 
@@ -28,8 +36,8 @@ public final class JCEPolicy {
             modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
 
             field.set(null, false);
-        } catch (Exception e) {
-            reThrow(e);
+        } catch (IllegalAccessException | NoSuchFieldException | ClassNotFoundException e) {
+            LOG.warn("Exception caught while trying to open JCE via reflection", e);
         }
     }
 }

@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.function.Function;
 
 import static com.bol.reflection.ReflectionCache.processDocument;
-import static com.bol.util.Thrower.reThrow;
 
 public class EncryptionEventListener extends AbstractMongoEventListener {
     Map<Class, Node> encrypted;
@@ -46,16 +45,12 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
     @Override
     public void onAfterLoad(AfterLoadEvent event) {
-        try {
-            DBObject dbObject = event.getDBObject();
+        DBObject dbObject = event.getDBObject();
 
-            Node node = encrypted.get(event.getType());
-            if (node == null) return;
+        Node node = encrypted.get(event.getType());
+        if (node == null) return;
 
-            cryptFields(dbObject, node, new Decoder()::apply);
-        } catch (Exception e) {
-            reThrow(e);
-        }
+        cryptFields(dbObject, node, new Decoder()::apply);
     }
 
     private class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
@@ -88,16 +83,12 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
 
     @Override
     public void onBeforeSave(BeforeSaveEvent event) {
-        try {
-            DBObject dbObject = event.getDBObject();
+        DBObject dbObject = event.getDBObject();
 
-            Node node = encrypted.get(event.getSource().getClass());
-            if (node == null) return;
+        Node node = encrypted.get(event.getSource().getClass());
+        if (node == null) return;
 
-            cryptFields(dbObject, node, new Encoder()::apply);
-        } catch (Exception e) {
-            reThrow(e);
-        }
+        cryptFields(dbObject, node, new Encoder()::apply);
     }
 
     private class Encoder extends BasicBSONEncoder implements Function<Object, Object> {

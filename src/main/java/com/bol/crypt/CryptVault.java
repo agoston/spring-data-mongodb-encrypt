@@ -5,14 +5,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.ShortBufferException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.SecureRandom;
 import java.util.function.Function;
-
-import static com.bol.util.Thrower.reThrow;
 
 public class CryptVault {
     private static final Logger LOG = LoggerFactory.getLogger(CryptVault.class);
@@ -98,8 +101,8 @@ public class CryptVault {
             if (len < cryptedLength) LOG.info("len was " + len + " instead of " + cryptedLength);
 
             return result;
-        } catch (Exception e) {
-            return reThrow(e);
+        } catch (ShortBufferException | IllegalBlockSizeException | BadPaddingException | InvalidAlgorithmParameterException | InvalidKeyException e) {
+            throw new RuntimeException("JCE exception caught while encrypting with version " + version, e);
         }
     }
 
@@ -115,8 +118,8 @@ public class CryptVault {
             Cipher cipher = cipher(cryptVersions[version].cipher);
             cipher.init(Cipher.DECRYPT_MODE, cryptVersions[version].key, iv_spec);
             return cipher.doFinal(data, cryptVersion.saltLength + 1, data.length - cryptVersion.saltLength - 1);
-        } catch (Exception e) {
-            return reThrow(e);
+        } catch (InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
+            throw new RuntimeException("JCE exception caught while decrypting with version " + version, e);
         }
     }
 
