@@ -193,3 +193,34 @@ If you want to use this library to encrypt arbitrary fields directly via mongo-d
         return new String(decrypted);
     }
 ```
+
+Expected size of encrypted field
+---
+The mongodb driver serializes every java object into BSON. Under the hood, we use the very same BSON serialization for maximum compatibility.
+
+You can expect the following extra sizes when you add an @Encrypted field:
+- 17..33 bytes per @Encrypted attribute for encryption overhead;
+- 12 bytes BSON overhead per field.
+
+This also means that often it is better for both performance and storage size to mark a whole sub-document with @Encrypted instead of half of its fields.
+You should check the resulting mongodb document's Binary field sizes to decide.
+
+
+Encrypting the whole document
+---
+While it was not the use case for this library, it is very well possible to do whole document encryption with it.
+Since the `_id` field (and all the other key fields) always have to be readable by mongodb, the best approach is to extract all the indexed keys into the root of the object, and keep the rest of the data as an @Encrypted sub-document, e.g.:
+
+```java
+@Field
+@Id
+public String id;
+
+@Field
+@Indexed
+public long otherId;
+
+@Field
+@Encrypted
+public SecretData data;
+```
