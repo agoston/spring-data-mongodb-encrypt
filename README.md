@@ -199,8 +199,8 @@ Expected size of encrypted field
 The mongodb driver serializes every java object into BSON. Under the hood, we use the very same BSON serialization for maximum compatibility.
 
 You can expect the following extra sizes when you add an @Encrypted field:
-- 17..33 bytes per @Encrypted attribute for encryption overhead;
-- 12 bytes BSON overhead per field.
+- 17..33 bytes for encryption overhead;
+- 12 bytes for BSON serialization overhead.
 
 This also means that often it is better for both performance and storage size to mark a whole sub-document with @Encrypted instead of half of its fields.
 You should check the resulting mongodb document's Binary field sizes to decide.
