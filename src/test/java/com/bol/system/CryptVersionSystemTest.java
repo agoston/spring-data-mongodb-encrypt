@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Base64;
@@ -40,6 +41,7 @@ public class CryptVersionSystemTest {
     }
 
     @Test
+    @DirtiesContext
     public void checkDefaultEncryptVersion() {
         cryptVault
                 .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(1, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="))
@@ -52,6 +54,7 @@ public class CryptVersionSystemTest {
     }
 
     @Test
+    @DirtiesContext
     public void checkMultipleEncryptVersion() {
         // default key version should now be 2
         byte[] result1 = cryptedResultInDb("versioning test");
