@@ -156,12 +156,12 @@ public class CryptVault {
     static final Function<Integer, Integer> AESLengthCalculator = i -> (i | 0xf) + 1;
 
     /** because, you know... java */
-    static byte toSignedByte(int val) {
+    public static byte toSignedByte(int val) {
         return (byte) (val + Byte.MIN_VALUE);
     }
 
     /** because, you know... java */
-    static int fromSignedByte(byte val) {
+    public static int fromSignedByte(byte val) {
         return ((int) val - Byte.MIN_VALUE);
     }
 
