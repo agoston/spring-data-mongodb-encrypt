@@ -13,16 +13,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
-/** needs mongodb running locally; fixme: use embedmongo */
+/** needs mongodb running locally; FIXME: use embedmongo */
+// FIXME: BSON sizes test for map and set is a bit flaky, need to investigate exact on-disk binary format deeper
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {MongoDBConfiguration.class})
 public class EncryptSystemTest {
@@ -186,6 +186,56 @@ public class EncryptSystemTest {
                 + MySubBean.MONGO_SECRETSTRING.length() + map.get("two").nonSensitiveData.length() + 7;
 
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETMAP), expectedLength);
+    }
+
+    @Test
+    public void checkEncryptedSetPrimitive() {
+        MyBean bean = new MyBean();
+        Set<String> set = new HashSet<>();
+        set.add("one");
+        set.add("two");
+        bean.secretSetPrimitive = set;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.secretSetPrimitive.contains("one"), is(true));
+        assertThat(fromDb.secretSetPrimitive.contains("two"), is(true));
+        assertThat(fromDb.secretSetPrimitive.size(), is(2));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+
+        int expectedLength = 12
+                + "one".length() + 7
+                + "two".length() + 7;
+
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSETPRIMITIVE), expectedLength);
+    }
+
+    @Test
+    public void checkEncryptedSetSubDocument() {
+        MyBean bean = new MyBean();
+        Set<MySubBean> set = new HashSet<>();
+        set.add(new MySubBean("sky is blue", "                 earth is round"));
+        set.add(new MySubBean("grass is green", "earth is flat"));
+        bean.secretSetSubDocument = set;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.secretSetSubDocument.size(), is(2));
+        assertTrue(fromDb.secretSetSubDocument.stream().anyMatch(s -> Objects.equals(s.nonSensitiveData, "sky is blue")));
+        assertTrue(fromDb.secretSetSubDocument.stream().anyMatch(s -> Objects.equals(s.nonSensitiveData, "grass is green")));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+
+        int expectedLength = 12
+                + MySubBean.MONGO_NONSENSITIVEDATA.length() + "sky is blue".length() + 12
+                + MySubBean.MONGO_SECRETSTRING.length() + "                 earth is round".length() + 12
+                + MySubBean.MONGO_NONSENSITIVEDATA.length() + "grass is green".length() + 12
+                + MySubBean.MONGO_SECRETSTRING.length() + "earth is flat".length() + 12;
+
+        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSETSUBDOCUMENT), expectedLength);
     }
 
     /**

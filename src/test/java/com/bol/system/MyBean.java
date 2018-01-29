@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Document(collection = MyBean.MONGO_MYBEAN)
 public class MyBean {
@@ -22,6 +23,8 @@ public class MyBean {
     public static final String MONGO_SECRETSTRINGLIST = "secretStringList";
     public static final String MONGO_NONSENSITIVEMAP = "nonSensitiveMap";
     public static final String MONGO_SECRETMAP = "secretMap";
+    public static final String MONGO_SECRETSETPRIMITIVE = "secretSetPrimitive";
+    public static final String MONGO_SECRETSETSUBDOCUMENT = "secretSetSubDocument";
 
     @Id
     public String id;
@@ -61,6 +64,14 @@ public class MyBean {
     @Field
     @Encrypted
     public Map<String, MySubBean> secretMap;
+
+    @Field
+    @Encrypted
+    public Set<String> secretSetPrimitive;
+
+    @Field
+    @Encrypted
+    public Set<MySubBean> secretSetSubDocument;
 
     @Field
     @Version
