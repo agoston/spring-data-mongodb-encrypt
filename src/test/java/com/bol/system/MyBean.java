@@ -74,6 +74,10 @@ public class MyBean {
     public Set<MySubBean> secretSetSubDocument;
 
     @Field
+    @Encrypted
+    public Map<String, List<MySubBean>> nestedListMap;
+
+    @Field
     @Version
     public Long version;
 }

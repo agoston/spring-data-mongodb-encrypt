@@ -135,7 +135,7 @@ public class EncryptSystemTest {
     @Test
     public void checkNonEncryptedMap() {
         MyBean bean = new MyBean();
-        Map<String, MySubBean> map = new HashMap();
+        Map<String, MySubBean> map = new HashMap<>();
         map.put("one", new MySubBean("sky is blue", "                 earth is round"));
         map.put("two", new MySubBean("grass is green", "earth is flat"));
         bean.nonSensitiveMap = map;
@@ -162,7 +162,7 @@ public class EncryptSystemTest {
     @Test
     public void checkEncryptedMap() {
         MyBean bean = new MyBean();
-        Map<String, MySubBean> map = new HashMap();
+        Map<String, MySubBean> map = new HashMap<>();
         map.put("one", new MySubBean("sky is blue", "                 earth is round"));
         map.put("two", new MySubBean("grass is green", "earth is flat"));
         bean.secretMap = map;
@@ -285,5 +285,22 @@ public class EncryptSystemTest {
         }
 
         assertThat("crypted fields look too much alike", equals, is(not(greaterThan(cryptedSecret1.length / 10))));
+    }
+
+    @Test
+    public void testNestedListMap() {
+        MyBean bean = new MyBean();
+        Map<String, List<MySubBean>> map = new HashMap<>();
+        map.put("one", Arrays.asList(new MySubBean("one1", "one2"), new MySubBean("one3", "one4")));
+        map.put("two", Arrays.asList(new MySubBean("two1", "two2"), new MySubBean("two3", "two4")));
+        bean.nestedListMap = map;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.nestedListMap.get("one").get(1).secretString, is("one4"));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        assertThat(fromMongo.get("nestedListMap"), is(instanceOf(byte[].class)));
     }
 }
