@@ -17,10 +17,10 @@ Features
 - high performance operation (no reflection at runtime)
 - key versioning (to help migrating to new key without need to convert data)
 - supports 256-bit AES out of the box
-- supports any encryption available in Java (JCE)
+- supports any encryption available in Java (via JCE)
 - simple (500 lines of code)
 - tested throughly
-- 0 dependencies
+- no dependencies
 
 For the impatient
 -----------------
@@ -31,7 +31,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>1.0.1</version>
+            <version>1.1.0</version>
         </dependency>
 ```
 
