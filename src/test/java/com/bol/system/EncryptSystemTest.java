@@ -42,7 +42,7 @@ public class EncryptSystemTest {
         bean.secretString = "earth is flat     ";
         bean.secretLong = 95459L;
         bean.secretBoolean = true;
-        bean.secretStringList = Arrays.asList("ear", "all", "I truly am a very very long string, oh yes, my kind sir");
+        bean.secretStringList = Arrays.asList("ear", "all", "I truly am a very very long string. I truly am a very very long string. I truly am a very very long string.");
         mongoTemplate.save(bean);
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
@@ -249,7 +249,7 @@ public class EncryptSystemTest {
      * - 1 byte 0-terminator after field value
      * - 2 bytes 0 terminator for wrapping BSONObject
      *
-     * (for a single primitive string, 12 extra bytes are added above its own length)
+     * (e.g. for a single primitive string, 12 extra bytes are added above its own length)
      */
     public void assertCryptLength(Object cryptedSecret, int serializedLength) {
         assertThat(cryptedSecret, is(instanceOf(byte[].class)));

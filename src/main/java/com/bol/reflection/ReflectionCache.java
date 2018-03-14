@@ -9,26 +9,23 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
-import java.util.stream.Collectors;
 
 // fixme: unit test for preparing the model via reflection
 public class ReflectionCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);
 
+    private static Map<Class, List<Node>> cyclicClassReference = new HashMap<>();
+
     public static List<Node> processDocument(Class objectClass) {
-        return processDocument(objectClass, new ArrayDeque<>());
-    }
-
-    static List<Node> processDocument(Class objectClass, Deque<Class> deque) {
-        List<Node> nodes = new ArrayList<>();
-
-        if (deque.contains(objectClass)) {
-            LOG.error("cyclic reference found; " + objectClass.getName() + " is already mapped via " + deque.stream().map(s -> s.getName()).collect(Collectors.toList()));
+        List<Node> nodes = cyclicClassReference.get(objectClass);
+        if (nodes != null) {
+            LOG.info("cyclic reference found; " + objectClass.getName() + " is already mapped");
             return nodes;
         }
 
-        deque.addLast(objectClass);
+        nodes = new ArrayList<>();
+        cyclicClassReference.put(objectClass, nodes);
 
         for (Field field : objectClass.getDeclaredFields()) {
             String fieldName = field.getName();
@@ -45,24 +42,16 @@ public class ReflectionCache {
                     Type fieldGenericType = field.getGenericType();
 
                     if (Collection.class.isAssignableFrom(fieldType)) {
-                        // descending into Collection
-                        ParameterizedType parameterizedType = (ParameterizedType) fieldGenericType;
-                        Class<?> genericClass = (Class<?>) parameterizedType.getActualTypeArguments()[0];
-
-                        List<Node> children = processDocument(genericClass, deque);
-                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children, Node.Type.LIST));
+                        List<Node> children = processParameterizedTypes(fieldGenericType);
+                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children.get(0).children, Node.Type.LIST));
 
                     } else if (Map.class.isAssignableFrom(fieldType)) {
-                        List<Node> children = processParameterizedTypes(fieldGenericType, deque);
-//                        List<Node> children = processDocument(genericClass, deque);
-                        if (!children.isEmpty()) {
-                            List<Node> mapKeys = Collections.singletonList(new Node("*", children, Node.Type.DOCUMENT));
-                            nodes.add(new Node(fieldName, mapKeys, Node.Type.MAP));
-                        }
+                        List<Node> children = processParameterizedTypes(fieldGenericType);
+                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children, Node.Type.MAP));
 
                     } else {
                         // descending into sub-documents
-                        List<Node> children = processDocument(fieldType, deque);
+                        List<Node> children = processDocument(fieldType);
                         if (!children.isEmpty()) nodes.add(new Node(fieldName, children, Node.Type.DOCUMENT));
                     }
                 }
@@ -71,19 +60,29 @@ public class ReflectionCache {
                 throw new IllegalArgumentException(objectClass.getName() + "." + fieldName, e);
             }
         }
-        deque.removeLast();
 
         return nodes;
     }
 
-    static List<Node> processParameterizedTypes(Type genericType, Deque<Class> deque) {
-        ParameterizedType parameterizedType = (ParameterizedType) genericType;
-        Type type = parameterizedType.getActualTypeArguments()[1];
-
+    static List<Node> processParameterizedTypes(Type type) {
         if (type instanceof Class) {
-            return processDocument((Class)type, deque);
+            return processDocument((Class) type);
+
         } else if (type instanceof ParameterizedType) {
-            throw new IllegalStateException();
+            ParameterizedType subType = (ParameterizedType) type;
+            Class rawType = (Class) subType.getRawType();
+
+            if (Collection.class.isAssignableFrom(rawType)) {
+                List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[0]);
+                if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.LIST));
+
+            } else if (Map.class.isAssignableFrom(rawType)) {
+                List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[1]);
+                if (!children.isEmpty()) return Collections.singletonList(new Node("*", children, Node.Type.DOCUMENT));
+
+            } else throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass());
+
+            return Collections.emptyList();
         } else throw new IllegalArgumentException("Unknown reflective type class " + type.getClass());
     }
 }
