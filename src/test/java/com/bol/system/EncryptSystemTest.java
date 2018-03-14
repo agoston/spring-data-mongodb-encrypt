@@ -293,14 +293,14 @@ public class EncryptSystemTest {
         Map<String, List<MySubBean>> map = new HashMap<>();
         map.put("one", Arrays.asList(new MySubBean("one1", "one2"), new MySubBean("one3", "one4")));
         map.put("two", Arrays.asList(new MySubBean("two1", "two2"), new MySubBean("two3", "two4")));
-        bean.nestedListMap = map;
+        bean.encryptedNestedListMap = map;
         mongoTemplate.save(bean);
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nestedListMap.get("one").get(1).secretString, is("one4"));
+        assertThat(fromDb.encryptedNestedListMap.get("one").get(1).secretString, is("one4"));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        assertThat(fromMongo.get("nestedListMap"), is(instanceOf(byte[].class)));
+        assertThat(fromMongo.get("encryptedNestedListMap"), is(instanceOf(byte[].class)));
     }
 }

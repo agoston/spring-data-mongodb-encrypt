@@ -75,7 +75,17 @@ public class MyBean {
 
     @Field
     @Encrypted
-    public Map<String, List<MySubBean>> nestedListMap;
+    public Map<String, List<MySubBean>> encryptedNestedListMap;
+
+//    @Field
+//    public Map<String, List<MySubBean>> nestedListMap;
+
+    @Field
+    @Encrypted
+    public List<List<MySubBean>> encryptedNestedListList;
+
+//    @Field
+//    public List<List<MySubBean>> nestedListList;
 
     @Field
     @Version

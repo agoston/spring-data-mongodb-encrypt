@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -30,41 +31,44 @@ public class ReflectionCache {
         deque.addLast(objectClass);
 
         for (Field field : objectClass.getDeclaredFields()) {
+            String fieldName = field.getName();
             try {
                 if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) continue;
                 if (!field.isAnnotationPresent(org.springframework.data.mongodb.core.mapping.Field.class)) continue;
 
                 if (field.isAnnotationPresent(Encrypted.class)) {
                     // direct @Encrypted annotation - crypt the corresponding field of BasicDbObject
-                    nodes.add(new Node(field.getName(), Collections.emptyList(), Node.Type.DIRECT));
-
-                } else if (Collection.class.isAssignableFrom(field.getType())) {
-                    // descending into Collection
-                    ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
-                    Class<?> genericClass = (Class<?>) parameterizedType.getActualTypeArguments()[0];
-
-                    List<Node> children = processDocument(genericClass, deque);
-                    if (!children.isEmpty()) nodes.add(new Node(field.getName(), children, Node.Type.LIST));
-
-                } else if (Map.class.isAssignableFrom(field.getType())) {
-                    // descending into Values of Map objects
-                    ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
-                    Class<?> genericClass = (Class<?>) parameterizedType.getActualTypeArguments()[1];
-
-                    List<Node> children = processDocument(genericClass, deque);
-                    if (!children.isEmpty()) {
-                        List<Node> mapKeys = Collections.singletonList(new Node("*", children, Node.Type.DOCUMENT));
-                        nodes.add(new Node(field.getName(), mapKeys, Node.Type.MAP));
-                    }
+                    nodes.add(new Node(fieldName, Collections.emptyList(), Node.Type.DIRECT));
 
                 } else {
-                    // descending into sub-documents
-                    List<Node> children = processDocument(field.getType(), deque);
-                    if (!children.isEmpty()) nodes.add(new Node(field.getName(), children, Node.Type.DOCUMENT));
+                    Class<?> fieldType = field.getType();
+                    Type fieldGenericType = field.getGenericType();
+
+                    if (Collection.class.isAssignableFrom(fieldType)) {
+                        // descending into Collection
+                        ParameterizedType parameterizedType = (ParameterizedType) fieldGenericType;
+                        Class<?> genericClass = (Class<?>) parameterizedType.getActualTypeArguments()[0];
+
+                        List<Node> children = processDocument(genericClass, deque);
+                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children, Node.Type.LIST));
+
+                    } else if (Map.class.isAssignableFrom(fieldType)) {
+                        List<Node> children = processParameterizedTypes(fieldGenericType, deque);
+//                        List<Node> children = processDocument(genericClass, deque);
+                        if (!children.isEmpty()) {
+                            List<Node> mapKeys = Collections.singletonList(new Node("*", children, Node.Type.DOCUMENT));
+                            nodes.add(new Node(fieldName, mapKeys, Node.Type.MAP));
+                        }
+
+                    } else {
+                        // descending into sub-documents
+                        List<Node> children = processDocument(fieldType, deque);
+                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children, Node.Type.DOCUMENT));
+                    }
                 }
 
             } catch (Exception e) {
-                throw new IllegalArgumentException(objectClass.getName() + "." + field.getName(), e);
+                throw new IllegalArgumentException(objectClass.getName() + "." + fieldName, e);
             }
         }
         deque.removeLast();
@@ -72,4 +76,14 @@ public class ReflectionCache {
         return nodes;
     }
 
+    static List<Node> processParameterizedTypes(Type genericType, Deque<Class> deque) {
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+        Type type = parameterizedType.getActualTypeArguments()[1];
+
+        if (type instanceof Class) {
+            return processDocument((Class)type, deque);
+        } else if (type instanceof ParameterizedType) {
+            throw new IllegalStateException();
+        } else throw new IllegalArgumentException("Unknown reflective type class " + type.getClass());
+    }
 }
