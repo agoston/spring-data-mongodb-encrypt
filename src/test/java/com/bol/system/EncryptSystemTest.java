@@ -288,7 +288,7 @@ public class EncryptSystemTest {
     }
 
     @Test
-    public void testNestedListMap() {
+    public void testEncryptedNestedListMap() {
         MyBean bean = new MyBean();
         Map<String, List<MySubBean>> map = new HashMap<>();
         map.put("one", Arrays.asList(new MySubBean("one1", "one2"), new MySubBean("one3", "one4")));
@@ -302,5 +302,47 @@ public class EncryptSystemTest {
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
         assertThat(fromMongo.get("encryptedNestedListMap"), is(instanceOf(byte[].class)));
+    }
+
+    @Test
+    public void testNestedListMap() {
+        MyBean bean = new MyBean();
+        Map<String, List<MySubBean>> map = new HashMap<>();
+        map.put("one", Arrays.asList(new MySubBean("one1", "one2"), new MySubBean("one3", "one4")));
+        map.put("two", Arrays.asList(new MySubBean("two1", "two2"), new MySubBean("two3", "two4")));
+        bean.nestedListMap = map;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.nestedListMap.get("one").get(1).secretString, is("one4"));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        DBObject dbNestedListMap = (DBObject)fromMongo.get("nestedListMap");
+        DBObject dbNestedList = (DBObject)dbNestedListMap.get("one");
+        DBObject dbBean = (DBObject)dbNestedList.get("1");
+        Object encryptedField = dbBean.get("secretString");
+        assertThat(encryptedField, is(instanceOf(byte[].class)));
+    }
+
+    @Test
+    public void testNestedListList() {
+        MyBean bean = new MyBean();
+        List<List<MySubBean>> list = new ArrayList<>();
+        list.add(Arrays.asList(new MySubBean("one1", "one2"), new MySubBean("one3", "one4")));
+        list.add(Arrays.asList(new MySubBean("two1", "two2"), new MySubBean("two3", "two4")));
+        bean.nestedListList = list;
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.nestedListList.get(0).get(1).secretString, is("one4"));
+
+        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        DBObject dbNestedListMap = (DBObject)fromMongo.get("nestedListList");
+        DBObject dbNestedList = (DBObject)dbNestedListMap.get("1");
+        DBObject dbBean = (DBObject)dbNestedList.get("1");
+        Object encryptedField = dbBean.get("secretString");
+        assertThat(encryptedField, is(instanceOf(byte[].class)));
     }
 }

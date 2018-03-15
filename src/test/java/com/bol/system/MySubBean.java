@@ -3,6 +3,10 @@ package com.bol.system;
 import com.bol.secure.Encrypted;
 import org.springframework.data.mongodb.core.mapping.Field;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 public class MySubBean {
     public static final String MONGO_NONSENSITIVEDATA = "nonSensitiveData";
     public static final String MONGO_SECRETSTRING = "secretString";
@@ -17,6 +21,9 @@ public class MySubBean {
     @Field
     /** this would cause infinite recursion in reflectioncache */
     public MyBean recursiveBean;
+
+    @Field
+    public Set<Map<String, List<Set<Map<String, MyBean>>>>> nestedCollectionsBean;
 
     public MySubBean() {}
 

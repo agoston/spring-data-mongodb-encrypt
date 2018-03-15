@@ -43,11 +43,11 @@ public class ReflectionCache {
 
                     if (Collection.class.isAssignableFrom(fieldType)) {
                         List<Node> children = processParameterizedTypes(fieldGenericType);
-                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children.get(0).children, Node.Type.LIST));
+                        if (!children.isEmpty()) nodes.add(new Node(fieldName, unwrap(children), Node.Type.LIST));
 
                     } else if (Map.class.isAssignableFrom(fieldType)) {
                         List<Node> children = processParameterizedTypes(fieldGenericType);
-                        if (!children.isEmpty()) nodes.add(new Node(fieldName, children, Node.Type.MAP));
+                        if (!children.isEmpty()) nodes.add(new Node(fieldName, unwrap(children), Node.Type.MAP));
 
                     } else {
                         // descending into sub-documents
@@ -64,9 +64,11 @@ public class ReflectionCache {
         return nodes;
     }
 
+    // FIXME: duplicated the switch() on type from above, although for Type, not Field; check if can be merged together somehow
     static List<Node> processParameterizedTypes(Type type) {
         if (type instanceof Class) {
-            return processDocument((Class) type);
+            List<Node> children = processDocument((Class) type);
+            if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.DOCUMENT));
 
         } else if (type instanceof ParameterizedType) {
             ParameterizedType subType = (ParameterizedType) type;
@@ -78,11 +80,18 @@ public class ReflectionCache {
 
             } else if (Map.class.isAssignableFrom(rawType)) {
                 List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[1]);
-                if (!children.isEmpty()) return Collections.singletonList(new Node("*", children, Node.Type.DOCUMENT));
+                if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.MAP));
 
             } else throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass());
 
-            return Collections.emptyList();
         } else throw new IllegalArgumentException("Unknown reflective type class " + type.getClass());
+        return Collections.emptyList();
+    }
+
+    static List<Node> unwrap(List<Node> result) {
+        if (result.size() != 1) return result;
+        Node node = result.get(0);
+        if (node.fieldName != null) return result;
+        return node.children;
     }
 }

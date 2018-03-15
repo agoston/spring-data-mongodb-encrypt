@@ -100,11 +100,19 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
         }
     }
 
+    // FIXME: switch by type looks weird, refactor
     void cryptFields(DBObject dbObject, Node node, Function<Object, Object> crypt) {
         if (node.type == Node.Type.MAP) {
             Node mapChildren = node.children.get(0);
             for (Map.Entry<String, Object> entry : ((BasicDBObject) dbObject).entrySet()) {
                 cryptFields((DBObject) entry.getValue(), mapChildren, crypt);
+            }
+            return;
+
+        } else if (node.type == Node.Type.LIST) {
+            Node mapChildren = node.children.get(0);
+            for (Object entry : (BasicDBList) dbObject) {
+                cryptFields((DBObject) entry, mapChildren, crypt);
             }
             return;
         }
@@ -116,7 +124,7 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
             if (!childNode.children.isEmpty()) {
                 if (value instanceof BasicDBList) {
                     for (Object o : (BasicDBList) value)
-                        cryptFields((DBObject) o, childNode, crypt);
+                        cryptFields((DBObject) o, childNode.children.get(0), crypt);
                 } else {
                     cryptFields((BasicDBObject) value, childNode, crypt);
                 }
