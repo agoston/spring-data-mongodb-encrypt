@@ -31,7 +31,6 @@ public class ReflectionCache {
             String fieldName = field.getName();
             try {
                 if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) continue;
-                if (!field.isAnnotationPresent(org.springframework.data.mongodb.core.mapping.Field.class)) continue;
 
                 if (field.isAnnotationPresent(Encrypted.class)) {
                     // direct @Encrypted annotation - crypt the corresponding field of BasicDbObject
