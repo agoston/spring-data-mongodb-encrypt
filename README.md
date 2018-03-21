@@ -12,7 +12,7 @@ Features
 
 - integrates transparently into `spring-data-mongodb`
 - supports sub-documents
-- supports List, Map @Fields and nested beans
+- supports Collections (List, Set), Maps and nested beans
 - high performance encryption
 - high performance operation (no reflection at runtime)
 - key versioning (to help migrating to new key without need to convert data)
