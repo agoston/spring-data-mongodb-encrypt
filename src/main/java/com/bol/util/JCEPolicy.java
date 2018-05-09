@@ -16,16 +16,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class JCEPolicy {
     private static final Logger LOG = LoggerFactory.getLogger(CryptVault.class);
 
-    private static final AtomicBoolean allow = new AtomicBoolean(false);
+    private static final AtomicBoolean hackApplied = new AtomicBoolean(false);
 
     private JCEPolicy() {
         // ...
     }
 
     public static void allowUnlimitedStrength() {
-        if (!allow.compareAndSet(false, true)) {
-            return;
-        }
+        if (!hackApplied.compareAndSet(false, true)) return;
 
         try {
             Field field = Class.forName("javax.crypto.JceSecurity").getDeclaredField("isRestricted");
@@ -37,7 +35,7 @@ public final class JCEPolicy {
 
             field.set(null, false);
         } catch (IllegalAccessException | NoSuchFieldException | ClassNotFoundException e) {
-            LOG.warn("Exception caught while trying to open JCE via reflection", e);
+            LOG.info("Exception caught while trying to open JCE via reflection", e);
         }
     }
 }
