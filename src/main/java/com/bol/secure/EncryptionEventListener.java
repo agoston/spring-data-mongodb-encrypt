@@ -22,10 +22,9 @@ import java.util.function.Function;
 import static com.bol.reflection.ReflectionCache.processDocument;
 
 public class EncryptionEventListener extends AbstractMongoEventListener {
-    Map<Class, Node> encrypted;
-
     @Autowired MongoMappingContext mappingContext;
 
+    Map<Class, Node> encrypted;
     CryptVault cryptVault;
 
     public EncryptionEventListener(CryptVault cryptVault) {
@@ -104,8 +103,8 @@ public class EncryptionEventListener extends AbstractMongoEventListener {
     void cryptFields(DBObject dbObject, Node node, Function<Object, Object> crypt) {
         if (node.type == Node.Type.MAP) {
             Node mapChildren = node.children.get(0);
-            for (Map.Entry<String, Object> entry : ((BasicDBObject) dbObject).entrySet()) {
-                cryptFields((DBObject) entry.getValue(), mapChildren, crypt);
+            for (Object entry : ((BasicDBObject) dbObject).values()) {
+                cryptFields((DBObject) entry, mapChildren, crypt);
             }
             return;
 
