@@ -10,7 +10,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 
-// fixme: unit test for preparing the model via reflection
+// FIXME: unit test for preparing the model via reflection
 public class ReflectionCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);

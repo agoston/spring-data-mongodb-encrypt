@@ -1,6 +1,7 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.secure.EncryptionEventListener;
 import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
@@ -38,7 +39,7 @@ public class MongoDBConfiguration extends AbstractMongoConfiguration {
     }
 
     @Bean
-    public EncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
+    public AbstractEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
         return new EncryptionEventListener(cryptVault);
     }
 }
