@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ReflectionMongoDBConfiguration extends MongoDBConfiguration {
     @Bean
-    public AbstractEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
+    public ReflectionEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
         return new ReflectionEncryptionEventListener(cryptVault);
     }
 }

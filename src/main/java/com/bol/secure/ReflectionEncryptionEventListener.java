@@ -2,6 +2,7 @@ package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
 import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
@@ -28,7 +29,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         cryptFields(dbObject, event.getSource().getClass(), new Encoder());
     }
 
-    void cryptFields(DBObject dbObject, Class node, Function<Object, Object> crypt) {
+    static void cryptFields(DBObject dbObject, Class node, Function<Object, Object> crypt) {
         for (String fieldName : dbObject.keySet()) {
             if (fieldName.equals("_class")) continue;
 
@@ -51,22 +52,36 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
                 if (Collection.class.isAssignableFrom(fieldType)) {
                     BasicDBList list = (BasicDBList) dbObject.get(fieldName);
                     for (Object o : list) {
-                        DBObject it = (DBObject) o;
-                        String className = (String) it.get("_class");
-                        Class<?> childNode;
-                        try {
-                            childNode = Class.forName(className);
-                        } catch (ClassNotFoundException e) {
-                            throw new IllegalStateException("unknown _class: " + className);
-                        }
-                        cryptFields(it, childNode, crypt);
+                        diveInto(crypt, (DBObject) o);
                     }
-                } else if (Map.class.isAssignableFrom(fieldType)) {
 
+                } else if (Map.class.isAssignableFrom(fieldType)) {
+                    DBObject map = (DBObject) dbObject.get(fieldName);
+                    for (String key : map.keySet()) {
+                        diveInto(crypt, (DBObject) map.get(key));
+                    }
                 } else {
-                    // descending into sub-documents
+                    Object o = dbObject.get(fieldName);
+                    if (o instanceof DBObject) {
+                        // descending into sub-documents
+                        DBObject subObject = (DBObject)o;
+                        diveInto(crypt, subObject);
+
+                    }
+                    // otherwise, it's a primitive - ignore
                 }
             }
         }
+    }
+
+    static void diveInto(Function<Object, Object> crypt, DBObject value) {
+        String className = (String) value.get("_class");
+        Class<?> childNode;
+        try {
+            childNode = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("unknown _class: " + className);
+        }
+        cryptFields(value, childNode, crypt);
     }
 }

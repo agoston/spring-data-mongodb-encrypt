@@ -23,9 +23,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 
 /** needs mongodb running locally; FIXME: use embedmongo */
 // FIXME: BSON sizes test for map and set is a bit flaky, need to investigate exact on-disk binary format deeper
-@RunWith(SpringRunner.class)
-@SpringBootTest(classes = {MongoDBConfiguration.class})
-public class EncryptSystemTest {
+public abstract class EncryptSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;
     @Autowired CryptVault cryptVault;

@@ -1,4 +1,4 @@
-package com.bol.system.reflection;
+package com.bol.system.polymorphism;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;

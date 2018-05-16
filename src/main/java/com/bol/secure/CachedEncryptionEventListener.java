@@ -18,12 +18,12 @@ import java.util.function.Function;
 
 import static com.bol.reflection.ReflectionCache.processDocument;
 
-public class EncryptionEventListener extends AbstractEncryptionEventListener {
+public class CachedEncryptionEventListener extends AbstractEncryptionEventListener {
     @Autowired MongoMappingContext mappingContext;
 
     Map<Class, Node> encrypted;
 
-    public EncryptionEventListener(CryptVault cryptVault) {
+    public CachedEncryptionEventListener(CryptVault cryptVault) {
         super(cryptVault);
     }
 
