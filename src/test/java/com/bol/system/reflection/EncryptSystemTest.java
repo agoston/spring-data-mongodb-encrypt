@@ -1,7 +1,6 @@
 package com.bol.system.reflection;
 
 import com.bol.crypt.CryptVault;
-import com.bol.secure.Encrypted;
 import com.bol.system.MyBean;
 import org.junit.Before;
 import org.junit.Test;
@@ -9,12 +8,15 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Collections;
-import java.util.List;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
+import static org.springframework.data.mongodb.core.query.Criteria.where;
+import static org.springframework.data.mongodb.core.query.Query.query;
 
 // FIXME: add doc
 // FIXME: add doc about configuring mongo mapper without _class
@@ -27,7 +29,7 @@ public class EncryptSystemTest {
 
     @Before
     public void cleanDb() {
-        mongoTemplate.dropCollection(MyBean.class);
+        mongoTemplate.dropCollection(TestObject.class);
     }
 
     @Test
@@ -38,34 +40,10 @@ public class EncryptSystemTest {
         testObject.list = Collections.singletonList(subObject);
 
         mongoTemplate.save(testObject);
-    }
 
-    /**
-     *
-     * > db.testObject.find().pretty();
-     * {
-     * 	"_id" : ObjectId("5afaf0941a547741cd41fb5d"),
-     * 	"_class" : "com.bol.system.reflection.EncryptSystemTest$TestObject",
-     * 	"list" : [
-     *                {
-     * 			"field" : "this is a test",
-     * 			"_class" : "com.bol.system.reflection.EncryptSystemTest$SubObject"
-     *        }
-     * 	]
-     * }
-     * */
-    @Document
-    class TestObject {
-        @Field
-        List<AbstractSubObject> list;
-    }
+        TestObject fromDb = mongoTemplate.findOne(query(where("_id").is(testObject.id)), TestObject.class);
 
-    class AbstractSubObject {
-    }
-
-    class SubObject extends AbstractSubObject {
-        @Field
-        @Encrypted
-        String field;
+        assertThat(fromDb.list, hasSize(1));
+        assertThat(((SubObject)fromDb.list.get(0)).field, is(subObject.field));
     }
 }
