@@ -1,6 +1,7 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.bol.system.cached.CachedMongoDBConfiguration;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
@@ -26,7 +27,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 
 /** needs mongodb running locally */
 @RunWith(SpringRunner.class)
-@SpringBootTest(classes = {MongoDBConfiguration.class})
+@SpringBootTest(classes = {CachedMongoDBConfiguration.class})
 public class CryptVersionSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;

@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.AbstractMongoConfiguration;
 
 import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
 
 @Configuration
 public abstract class MongoDBConfiguration extends AbstractMongoConfiguration {
@@ -21,6 +23,11 @@ public abstract class MongoDBConfiguration extends AbstractMongoConfiguration {
     @Override
     protected String getDatabaseName() {
         return "test";
+    }
+
+    @Override
+    protected Collection<String> getMappingBasePackages() {
+        return Collections.singletonList(MongoDBConfiguration.class.getPackage().getName());
     }
 
     @Override

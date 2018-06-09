@@ -3,6 +3,7 @@ package com.bol.reflection;
 import com.bol.secure.Encrypted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -17,19 +18,19 @@ public class ReflectionCache {
     private static Map<Class, List<Node>> cyclicClassReference = new HashMap<>();
 
     public static List<Node> processDocument(Class objectClass) {
-        List<Node> nodes = cyclicClassReference.get(objectClass);
-        if (nodes != null) {
+        List<Node> result = cyclicClassReference.get(objectClass);
+        if (result != null) {
             LOG.info("cyclic reference found; " + objectClass.getName() + " is already mapped");
-            return nodes;
+            return result;
         }
 
-        nodes = new ArrayList<>();
+        List<Node> nodes = new ArrayList<>();
         cyclicClassReference.put(objectClass, nodes);
 
-        for (Field field : objectClass.getDeclaredFields()) {
+        ReflectionUtils.doWithFields(objectClass, field -> {
             String fieldName = field.getName();
             try {
-                if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) continue;
+                if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) return;
 
                 if (field.isAnnotationPresent(Encrypted.class)) {
                     // direct @Encrypted annotation - crypt the corresponding field of BasicDbObject
@@ -57,7 +58,7 @@ public class ReflectionCache {
             } catch (Exception e) {
                 throw new IllegalArgumentException(objectClass.getName() + "." + fieldName, e);
             }
-        }
+        });
 
         return nodes;
     }

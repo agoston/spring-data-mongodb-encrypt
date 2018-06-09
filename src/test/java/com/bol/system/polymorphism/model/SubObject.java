@@ -1,10 +1,10 @@
-package com.bol.system.polymorphism;
+package com.bol.system.polymorphism.model;
 
 import com.bol.secure.Encrypted;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-class SubObject extends AbstractSubObject {
+public class SubObject extends AbstractSubObject {
     @Field
     @Encrypted
-    String field;
+    public String field;
 }

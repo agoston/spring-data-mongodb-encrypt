@@ -1,6 +1,10 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.bol.system.model.Person;
+import com.bol.system.model.Ssn;
+import com.bol.system.polymorphism.model.SubObject;
+import com.bol.system.polymorphism.model.TestObject;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
@@ -9,6 +13,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.ReflectionUtils;
 
 import java.util.*;
 
@@ -338,5 +344,30 @@ public abstract class EncryptSystemTest {
         DBObject dbBean = (DBObject) dbNestedList.get("1");
         Object encryptedField = dbBean.get("secretString");
         assertThat(encryptedField, is(instanceOf(byte[].class)));
+    }
+
+    @Test
+    public void checkSuperclassInheritedFields() {
+        Person person = new Person();
+        Ssn ssn = new Ssn();
+        person.ssn = ssn;
+        ssn.ssn = "my ssn";
+        ssn.someSecret = "my secret";
+        ssn.notSecret = "not secret";
+        mongoTemplate.save(person);
+
+        Person fromDb = mongoTemplate.findOne(query(where("_id").is(person.id)), Person.class);
+        assertThat(fromDb.ssn.notSecret, is(person.ssn.notSecret));
+        assertThat(fromDb.ssn.someSecret, is(person.ssn.someSecret));
+        assertThat(fromDb.ssn.ssn, is(person.ssn.ssn));
+
+        DBObject fromMongo = mongoTemplate.getCollection(Person.MONGO_PERSON).find(new BasicDBObject("_id", new ObjectId(person.id))).next();
+        DBObject dbBean = (DBObject) fromMongo.get("ssn");
+        Object encryptedField = dbBean.get("ssn");
+        assertThat(encryptedField, is(instanceOf(byte[].class)));
+        Object encryptedInheritedField = dbBean.get("someSecret");
+        assertThat(encryptedInheritedField, is(instanceOf(byte[].class)));
+        Object noncryptedInheritedField = dbBean.get("notSecret");
+        assertThat(noncryptedInheritedField, is(instanceOf(String.class)));
     }
 }

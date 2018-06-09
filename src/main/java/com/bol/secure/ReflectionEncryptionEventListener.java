@@ -6,6 +6,7 @@ import com.mongodb.DBObject;
 import org.bson.types.BasicBSONList;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
+import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -35,12 +36,8 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         for (String fieldName : dbObject.keySet()) {
             if (fieldName.equals("_class")) continue;
 
-            Field field;
-            try {
-                field = node.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException e) {
-                continue;
-            }
+            Field field = ReflectionUtils.findField(node, fieldName);
+            if (field == null) continue;
 
             if (field.isAnnotationPresent(Encrypted.class)) {
                 // direct encryption
@@ -82,31 +79,36 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
 
     static void diveInto(Function<Object, Object> crypt, DBObject value, Type fieldType) {
         Class<?> childNode = fetchClassFromField(value);
+        if (childNode != null) {
+            cryptFields(value, childNode, crypt);
+            return;
+        }
 
         // fall back to reflection
-        if (childNode == null) {
-            if (fieldType instanceof Class) {
-                childNode = (Class) fieldType;
-                cryptFields(value, childNode, crypt);
+        if (fieldType instanceof Class) {
+            childNode = (Class) fieldType;
+            cryptFields(value, childNode, crypt);
 
-            } else if (fieldType instanceof ParameterizedType) {
-                ParameterizedType subType = (ParameterizedType) fieldType;
-                Class rawType = (Class) subType.getRawType();
+        } else if (fieldType instanceof ParameterizedType) {
+            ParameterizedType subType = (ParameterizedType) fieldType;
+            Class rawType = (Class) subType.getRawType();
 
-                if (Collection.class.isAssignableFrom(rawType)) {
-                    Type subFieldType = subType.getActualTypeArguments()[0];
-                    BasicDBList list = (BasicDBList) value;
-                    for (Object o : list) diveInto(crypt, (DBObject) o, subFieldType);
+            if (Collection.class.isAssignableFrom(rawType)) {
+                Type subFieldType = subType.getActualTypeArguments()[0];
+                BasicDBList list = (BasicDBList) value;
+                for (Object o : list) diveInto(crypt, (DBObject) o, subFieldType);
 
-                } else if (Map.class.isAssignableFrom(rawType)) {
-                    Type subFieldType = subType.getActualTypeArguments()[1];
-                    for (String key : value.keySet()) {
-                        diveInto(crypt, (DBObject) value.get(key), subFieldType);
-                    }
+            } else if (Map.class.isAssignableFrom(rawType)) {
+                Type subFieldType = subType.getActualTypeArguments()[1];
+                for (String key : value.keySet()) {
+                    diveInto(crypt, (DBObject) value.get(key), subFieldType);
+                }
 
-                } else throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass());
-
-            } else throw new IllegalArgumentException("Unknown reflective type class " + fieldType.getClass());
+            } else {
+                throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass() + "; should be Map<> or Collection<>");
+            }
+        } else {
+            throw new IllegalArgumentException("Unknown reflective type class " + fieldType.getClass());
         }
     }
 

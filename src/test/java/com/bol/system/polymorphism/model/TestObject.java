@@ -1,4 +1,4 @@
-package com.bol.system.polymorphism;
+package com.bol.system.polymorphism.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -21,10 +21,12 @@ import java.util.List;
  * }
  * */
 @Document
-class TestObject {
+public class TestObject {
+    public static final String MONGO_TESTOBJECT = "testObject";
+
     @Id
     public String id;
 
     @Field
-    List<AbstractSubObject> list;
+    public List<AbstractSubObject> list;
 }
