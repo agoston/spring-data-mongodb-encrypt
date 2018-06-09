@@ -7,11 +7,8 @@ import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.*;
 
@@ -21,7 +18,6 @@ import static org.junit.Assert.assertTrue;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
-/** needs mongodb running locally; FIXME: use embedmongo */
 // FIXME: BSON sizes test for map and set is a bit flaky, need to investigate exact on-disk binary format deeper
 public abstract class EncryptSystemTest {
 
@@ -246,7 +242,7 @@ public abstract class EncryptSystemTest {
      * - field value (1byte/char)
      * - 1 byte 0-terminator after field value
      * - 2 bytes 0 terminator for wrapping BSONObject
-     *
+     * <p>
      * (e.g. for a single primitive string, 12 extra bytes are added above its own length)
      */
     public void assertCryptLength(Object cryptedSecret, int serializedLength) {
@@ -316,9 +312,9 @@ public abstract class EncryptSystemTest {
         assertThat(fromDb.nestedListMap.get("one").get(1).secretString, is("one4"));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        DBObject dbNestedListMap = (DBObject)fromMongo.get("nestedListMap");
-        DBObject dbNestedList = (DBObject)dbNestedListMap.get("one");
-        DBObject dbBean = (DBObject)dbNestedList.get("1");
+        DBObject dbNestedListMap = (DBObject) fromMongo.get("nestedListMap");
+        DBObject dbNestedList = (DBObject) dbNestedListMap.get("one");
+        DBObject dbBean = (DBObject) dbNestedList.get("1");
         Object encryptedField = dbBean.get("secretString");
         assertThat(encryptedField, is(instanceOf(byte[].class)));
     }
@@ -337,9 +333,9 @@ public abstract class EncryptSystemTest {
         assertThat(fromDb.nestedListList.get(0).get(1).secretString, is("one4"));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        DBObject dbNestedListMap = (DBObject)fromMongo.get("nestedListList");
-        DBObject dbNestedList = (DBObject)dbNestedListMap.get("1");
-        DBObject dbBean = (DBObject)dbNestedList.get("1");
+        DBObject dbNestedListMap = (DBObject) fromMongo.get("nestedListList");
+        DBObject dbNestedList = (DBObject) dbNestedListMap.get("1");
+        DBObject dbBean = (DBObject) dbNestedList.get("1");
         Object encryptedField = dbBean.get("secretString");
         assertThat(encryptedField, is(instanceOf(byte[].class)));
     }

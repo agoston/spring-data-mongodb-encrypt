@@ -1,7 +1,6 @@
 package com.bol.system.polymorphism;
 
 import com.bol.crypt.CryptVault;
-import com.bol.system.EncryptSystemTest;
 import com.bol.system.reflection.ReflectionMongoDBConfiguration;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,7 +22,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 // FIXME: add doc about configuring mongo mapper without _class
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {ReflectionMongoDBConfiguration.class})
-public class PolymorphismSystemTest extends EncryptSystemTest {
+public class PolymorphismSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;
     @Autowired CryptVault cryptVault;
@@ -43,6 +42,8 @@ public class PolymorphismSystemTest extends EncryptSystemTest {
         mongoTemplate.save(testObject);
 
         TestObject fromDb = mongoTemplate.findOne(query(where("_id").is(testObject.id)), TestObject.class);
+
+        // FIXME: test that on-disk data is encrypted
 
         assertThat(fromDb.list, hasSize(1));
         assertThat(((SubObject) fromDb.list.get(0)).field, is(subObject.field));

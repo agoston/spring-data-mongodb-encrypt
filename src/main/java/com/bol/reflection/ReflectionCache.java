@@ -10,7 +10,6 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 
-// FIXME: unit test for preparing the model via reflection
 public class ReflectionCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);
@@ -63,7 +62,6 @@ public class ReflectionCache {
         return nodes;
     }
 
-    // FIXME: duplicated the switch() on type from above, although for Type, not Field; check if can be merged together somehow
     static List<Node> processParameterizedTypes(Type type) {
         if (type instanceof Class) {
             List<Node> children = processDocument((Class) type);
