@@ -23,8 +23,6 @@ import static org.junit.Assert.assertThat;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
-// FIXME: add doc
-// FIXME: add doc about configuring mongo mapper without _class
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {ReflectionMongoDBConfiguration.class})
 public class PolymorphismSystemTest {
