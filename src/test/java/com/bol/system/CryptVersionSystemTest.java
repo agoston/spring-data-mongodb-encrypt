@@ -1,6 +1,7 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.bol.system.cached.CachedMongoDBConfiguration;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
@@ -10,7 +11,6 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
@@ -20,16 +20,14 @@ import java.util.List;
 import static com.bol.crypt.CryptVault.fromSignedByte;
 import static com.bol.system.MyBean.MONGO_NONSENSITIVEDATA;
 import static com.bol.system.MyBean.MONGO_SECRETSTRING;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
-/** needs mongodb running locally; fixme: use embedmongo */
+/** needs mongodb running locally */
 @RunWith(SpringRunner.class)
-@SpringBootTest(classes = {MongoDBConfiguration.class})
+@SpringBootTest(classes = {CachedMongoDBConfiguration.class})
 public class CryptVersionSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;

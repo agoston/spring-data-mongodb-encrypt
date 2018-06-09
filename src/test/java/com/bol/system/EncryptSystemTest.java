@@ -1,17 +1,20 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.bol.system.model.Person;
+import com.bol.system.model.Ssn;
+import com.bol.system.polymorphism.model.SubObject;
+import com.bol.system.polymorphism.model.TestObject;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.ReflectionUtils;
 
 import java.util.*;
 
@@ -21,11 +24,8 @@ import static org.junit.Assert.assertTrue;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
-/** needs mongodb running locally; FIXME: use embedmongo */
 // FIXME: BSON sizes test for map and set is a bit flaky, need to investigate exact on-disk binary format deeper
-@RunWith(SpringRunner.class)
-@SpringBootTest(classes = {MongoDBConfiguration.class})
-public class EncryptSystemTest {
+public abstract class EncryptSystemTest {
 
     @Autowired MongoTemplate mongoTemplate;
     @Autowired CryptVault cryptVault;
@@ -248,7 +248,7 @@ public class EncryptSystemTest {
      * - field value (1byte/char)
      * - 1 byte 0-terminator after field value
      * - 2 bytes 0 terminator for wrapping BSONObject
-     *
+     * <p>
      * (e.g. for a single primitive string, 12 extra bytes are added above its own length)
      */
     public void assertCryptLength(Object cryptedSecret, int serializedLength) {
@@ -318,9 +318,9 @@ public class EncryptSystemTest {
         assertThat(fromDb.nestedListMap.get("one").get(1).secretString, is("one4"));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        DBObject dbNestedListMap = (DBObject)fromMongo.get("nestedListMap");
-        DBObject dbNestedList = (DBObject)dbNestedListMap.get("one");
-        DBObject dbBean = (DBObject)dbNestedList.get("1");
+        DBObject dbNestedListMap = (DBObject) fromMongo.get("nestedListMap");
+        DBObject dbNestedList = (DBObject) dbNestedListMap.get("one");
+        DBObject dbBean = (DBObject) dbNestedList.get("1");
         Object encryptedField = dbBean.get("secretString");
         assertThat(encryptedField, is(instanceOf(byte[].class)));
     }
@@ -339,10 +339,35 @@ public class EncryptSystemTest {
         assertThat(fromDb.nestedListList.get(0).get(1).secretString, is("one4"));
 
         DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
-        DBObject dbNestedListMap = (DBObject)fromMongo.get("nestedListList");
-        DBObject dbNestedList = (DBObject)dbNestedListMap.get("1");
-        DBObject dbBean = (DBObject)dbNestedList.get("1");
+        DBObject dbNestedListMap = (DBObject) fromMongo.get("nestedListList");
+        DBObject dbNestedList = (DBObject) dbNestedListMap.get("1");
+        DBObject dbBean = (DBObject) dbNestedList.get("1");
         Object encryptedField = dbBean.get("secretString");
         assertThat(encryptedField, is(instanceOf(byte[].class)));
+    }
+
+    @Test
+    public void checkSuperclassInheritedFields() {
+        Person person = new Person();
+        Ssn ssn = new Ssn();
+        person.ssn = ssn;
+        ssn.ssn = "my ssn";
+        ssn.someSecret = "my secret";
+        ssn.notSecret = "not secret";
+        mongoTemplate.save(person);
+
+        Person fromDb = mongoTemplate.findOne(query(where("_id").is(person.id)), Person.class);
+        assertThat(fromDb.ssn.notSecret, is(person.ssn.notSecret));
+        assertThat(fromDb.ssn.someSecret, is(person.ssn.someSecret));
+        assertThat(fromDb.ssn.ssn, is(person.ssn.ssn));
+
+        DBObject fromMongo = mongoTemplate.getCollection(Person.MONGO_PERSON).find(new BasicDBObject("_id", new ObjectId(person.id))).next();
+        DBObject dbBean = (DBObject) fromMongo.get("ssn");
+        Object encryptedField = dbBean.get("ssn");
+        assertThat(encryptedField, is(instanceOf(byte[].class)));
+        Object encryptedInheritedField = dbBean.get("someSecret");
+        assertThat(encryptedInheritedField, is(instanceOf(byte[].class)));
+        Object noncryptedInheritedField = dbBean.get("notSecret");
+        assertThat(noncryptedInheritedField, is(instanceOf(String.class)));
     }
 }

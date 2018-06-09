@@ -1,7 +1,6 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
-import com.bol.secure.EncryptionEventListener;
 import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import com.mongodb.ServerAddress;
@@ -11,9 +10,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.AbstractMongoConfiguration;
 
 import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
 
 @Configuration
-public class MongoDBConfiguration extends AbstractMongoConfiguration {
+public abstract class MongoDBConfiguration extends AbstractMongoConfiguration {
 
     private static final byte[] secretKey = Base64.getDecoder().decode("hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=");
 
@@ -22,6 +23,11 @@ public class MongoDBConfiguration extends AbstractMongoConfiguration {
     @Override
     protected String getDatabaseName() {
         return "test";
+    }
+
+    @Override
+    protected Collection<String> getMappingBasePackages() {
+        return Collections.singletonList(MongoDBConfiguration.class.getPackage().getName());
     }
 
     @Override
@@ -35,10 +41,5 @@ public class MongoDBConfiguration extends AbstractMongoConfiguration {
         return new CryptVault()
                 .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, secretKey)
                 .withDefaultKeyVersion(0);
-    }
-
-    @Bean
-    public EncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
-        return new EncryptionEventListener(cryptVault);
     }
 }
