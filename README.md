@@ -11,7 +11,7 @@ Features
 --------
 
 - integrates transparently into `spring-data-mongodb`
-- supports nested Collectioms, Maps and beans
+- supports nested Collections, Maps and beans
 - high performance (no reflection, optimized encryption)
 - key versioning (to help migrating to new key without need to convert data)
 - supports 256-bit AES out of the box
