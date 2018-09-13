@@ -18,7 +18,8 @@ public class AbstractEncryptionEventListener extends AbstractMongoEventListener 
 
     class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
         public Object apply(Object o) {
-            byte[] serialized = cryptVault.decrypt((byte[]) o);
+            byte[] data = ((Binary) o).getData();
+            byte[] serialized = cryptVault.decrypt((data));
             BSONCallback bsonCallback = new BasicDBObjectCallback();
             decode(serialized, bsonCallback);
             BSONObject deserialized = (BSONObject) bsonCallback.get();
@@ -26,7 +27,9 @@ public class AbstractEncryptionEventListener extends AbstractMongoEventListener 
         }
     }
 
-    /** BasicBSONEncoder returns BasicBSONObject which makes mongotemplate converter choke :( */
+    /**
+     * BasicBSONEncoder returns BasicBSONObject which makes mongotemplate converter choke :(
+     */
     class BasicDBObjectCallback extends BasicBSONCallback {
         @Override
         public BSONObject create() {

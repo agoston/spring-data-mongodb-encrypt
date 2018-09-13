@@ -88,6 +88,9 @@ public class MyBean {
     public List<List<MySubBean>> nestedListList;
 
     @Field
+    public List<List<MySubBeanNotEncrypted>> nestedListListNotEncrypted;
+
+    @Field
     @Version
     public Long version;
 }
