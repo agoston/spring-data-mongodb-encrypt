@@ -2,11 +2,11 @@
 [![Build Status](https://secure.travis-ci.org/bolcom/spring-data-mongodb-encrypt.svg)](http://travis-ci.org/bolcom/spring-data-mongodb-encrypt)
 
 
-#spring-data-mongodb-encrypt
+# spring-data-mongodb-encrypt
 
 Allows any @Field to be marked with @Encrypted for per-field encryption.
 
-##Features
+## Features
 
 - integrates transparently into `spring-data-mongodb`
 - supports nested Collections, Maps and beans
@@ -22,7 +22,7 @@ Allows any @Field to be marked with @Encrypted for per-field encryption.
 
 Please use the [spring-data-1](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-1) branch, both for code and documentation.
 
-##For the impatient
+## For the impatient
 
 Add dependency:
 
@@ -145,7 +145,7 @@ Example result in mongodb:
 }
 ```
 
-##Polymorphism (and why it's bad)
+## Polymorphism (and why it's bad)
 
 `spring-data-mongodb` supports polymorphism via a rather questionable mechanism: when the nested bean's type is not deductable from the java generic type, it would simply place an `_class` field in the document to specify the fully qualified class name for deserialization.
 This has some very serious drawbacks:
@@ -186,7 +186,7 @@ Replace the `CachedEncryptionEventListener` by `ReflectionEncryptionEventListene
 Note that using reflection at runtime will come at a performance cost and the drawbacks outlined above.
 
 
-##Encrypt other data
+## Encrypt other data
 
 It's perfectly possible to use the powerful encryption functionality of this library for custom purposes. Example:
 
@@ -233,7 +233,7 @@ If you want to use this library to encrypt arbitrary fields directly via mongo-d
     }
 ```
 
-##Encrypting the whole document
+## Encrypting the whole document
 
 While it was not the use case for this library, it is very well possible to do whole document encryption with it.
 Since the `_id` field (and all the other key fields) always have to be readable by mongodb, the best approach is to extract all the indexed keys into the root of the object, and keep the rest of the data as an @Encrypted sub-document, e.g.:
@@ -253,7 +253,7 @@ public long otherId;
 public SecretData data;
 ```
 
-##Expected size of encrypted field
+## Expected size of encrypted field
 
 The mongodb driver serializes every java object into BSON. Under the hood, we use the very same BSON serialization for maximum compatibility.
 
