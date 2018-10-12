@@ -1,9 +1,7 @@
 package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
-import com.mongodb.BasicDBList;
-import com.mongodb.DBObject;
-import org.bson.types.BasicBSONList;
+import org.bson.Document;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 import org.springframework.util.ReflectionUtils;
@@ -11,7 +9,9 @@ import org.springframework.util.ReflectionUtils;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -20,64 +20,60 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         super(cryptVault);
     }
 
-    @Override
-    public void onAfterLoad(AfterLoadEvent event) {
-        DBObject dbObject = event.getDBObject();
-        cryptFields(dbObject, event.getType(), new Decoder());
-    }
-
-    @Override
-    public void onBeforeSave(BeforeSaveEvent event) {
-        DBObject dbObject = event.getDBObject();
-        cryptFields(dbObject, event.getSource().getClass(), new Encoder());
-    }
-
-    static void cryptFields(DBObject dbObject, Class node, Function<Object, Object> crypt) {
-        for (String fieldName : dbObject.keySet()) {
+    static void cryptFields(Document document, Class node, Function<Object, Object> crypt) {
+        for (Map.Entry<String, Object> field : document.entrySet()) {
+            String fieldName = field.getKey();
             if (fieldName.equals("_class")) continue;
 
-            Field field = ReflectionUtils.findField(node, fieldName);
-            if (field == null) continue;
+            Field classField = ReflectionUtils.findField(node, fieldName);
+            if (classField == null) continue;
 
-            if (field.isAnnotationPresent(Encrypted.class)) {
+            Object fieldValue = field.getValue();
+
+            if (classField.isAnnotationPresent(Encrypted.class)) {
                 // direct encryption
-                Object value = dbObject.get(fieldName);
-                dbObject.put(fieldName, crypt.apply(value));
+                document.put(fieldName, crypt.apply(fieldValue));
 
             } else {
 
-                Class<?> fieldType = field.getType();
-
-                if (Collection.class.isAssignableFrom(fieldType)) {
-                    ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
+                if (Collection.class.isAssignableFrom(classField.getType())) {
+                    ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
                     Type subFieldType = parameterizedType.getActualTypeArguments()[0];
-                    BasicDBList list = (BasicDBList) dbObject.get(fieldName);
+                    ArrayList list = (ArrayList) fieldValue;
                     for (Object o : list) {
-                        diveInto(crypt, (DBObject) o, subFieldType);
+                        diveIntoGeneric(crypt, o, subFieldType);
                     }
 
-                } else if (Map.class.isAssignableFrom(fieldType)) {
-                    ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
+                } else if (Map.class.isAssignableFrom(classField.getType())) {
+                    ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
                     Type subFieldType = parameterizedType.getActualTypeArguments()[1];
-                    DBObject map = (DBObject) dbObject.get(fieldName);
+                    Document map = (Document) fieldValue;
                     for (String key : map.keySet()) {
-                        diveInto(crypt, (DBObject) map.get(key), subFieldType);
+                        diveIntoGeneric(crypt, map.get(key), subFieldType);
                     }
                 } else {
-                    Object o = dbObject.get(fieldName);
-                    if (o instanceof DBObject) {
+                    if (fieldValue instanceof Document) {
                         // descending into sub-documents
-                        DBObject subObject = (DBObject) o;
-                        diveInto(crypt, subObject, fieldType);
-
+                        Document subObject = (Document) fieldValue;
+                        diveIntoGeneric(crypt, subObject, classField.getType());
                     }
-                    // otherwise, it's a primitive - ignore
                 }
             }
         }
     }
 
-    static void diveInto(Function<Object, Object> crypt, DBObject value, Type fieldType) {
+
+    static void diveIntoGeneric(Function<Object, Object> crypt, Object value, Type fieldType) {
+        if (value instanceof Document)
+            diveInto(crypt, (Document) value, fieldType);
+        else if (value instanceof List)
+            diveInto(crypt, (List) value, fieldType);
+        else
+            throw new IllegalArgumentException("Unknown reflective value class " + value.getClass());
+    }
+
+
+    static void diveInto(Function<Object, Object> crypt, Document value, Type fieldType) {
         Class<?> childNode = fetchClassFromField(value);
         if (childNode != null) {
             cryptFields(value, childNode, crypt);
@@ -88,21 +84,21 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         if (fieldType instanceof Class) {
             childNode = (Class) fieldType;
             cryptFields(value, childNode, crypt);
+        } else {
+            throw new IllegalArgumentException("Unknown reflective type class " + fieldType.getClass());
+        }
+    }
 
-        } else if (fieldType instanceof ParameterizedType) {
+    static void diveInto(Function<Object, Object> crypt, List value, Type fieldType) {
+        if (fieldType instanceof ParameterizedType) {
             ParameterizedType subType = (ParameterizedType) fieldType;
             Class rawType = (Class) subType.getRawType();
 
             if (Collection.class.isAssignableFrom(rawType)) {
                 Type subFieldType = subType.getActualTypeArguments()[0];
-                BasicDBList list = (BasicDBList) value;
-                for (Object o : list) diveInto(crypt, (DBObject) o, subFieldType);
 
-            } else if (Map.class.isAssignableFrom(rawType)) {
-                Type subFieldType = subType.getActualTypeArguments()[1];
-                for (String key : value.keySet()) {
-                    diveInto(crypt, (DBObject) value.get(key), subFieldType);
-                }
+                for (Object o : value)
+                    diveIntoGeneric(crypt, o, subFieldType);
 
             } else {
                 throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass() + "; should be Map<> or Collection<>");
@@ -112,16 +108,27 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         }
     }
 
-    private static Class<?> fetchClassFromField(DBObject value) {
-        // mongo-java-driver's basicbsonlist is one dirty hack :(
-        if (value instanceof BasicBSONList) return null;
-
+    private static Class<?> fetchClassFromField(Document value) {
         String className = (String) value.get("_class");
         if (className != null) {
             try {
                 return Class.forName(className);
-            } catch (ClassNotFoundException ignored) { }
+            } catch (ClassNotFoundException ignored) {
+            }
         }
         return null;
+    }
+
+    @Override
+    public void onAfterLoad(AfterLoadEvent event) {
+        Document document = event.getDocument();
+        cryptFields(document, event.getType(), new Decoder());
+    }
+
+    @Override
+    public void onBeforeSave(BeforeSaveEvent event) {
+        Document document = event.getDocument();
+        cryptFields(document, event.getSource().getClass(), new Encoder());
+
     }
 }

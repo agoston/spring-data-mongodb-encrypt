@@ -2,8 +2,8 @@ package com.bol.system;
 
 import com.bol.crypt.CryptVault;
 import com.bol.system.cached.CachedMongoDBConfiguration;
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
+import org.bson.Document;
+import org.bson.types.Binary;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,7 +25,9 @@ import static org.junit.Assert.assertThat;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
-/** needs mongodb running locally */
+/**
+ * needs mongodb running locally
+ */
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {CachedMongoDBConfiguration.class})
 public class CryptVersionSystemTest {
@@ -86,9 +88,11 @@ public class CryptVersionSystemTest {
         bean.nonSensitiveData = getClass().getSimpleName();
         mongoTemplate.insert(bean);
 
-        DBObject fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).next();
+        Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
         Object cryptedSecret = fromMongo.get(MONGO_SECRETSTRING);
-        assertThat(cryptedSecret, is(instanceOf(byte[].class)));
-        return (byte[]) cryptedSecret;
+        assertThat(cryptedSecret, is(instanceOf(Binary.class)));
+        Object cryptedSecretData = ((Binary) cryptedSecret).getData();
+        assertThat(cryptedSecretData, is(instanceOf(byte[].class)));
+        return (byte[]) cryptedSecretData;
     }
 }

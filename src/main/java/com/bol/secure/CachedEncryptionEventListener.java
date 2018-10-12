@@ -2,9 +2,7 @@ package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
 import com.bol.reflection.Node;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
@@ -39,55 +37,71 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
 
     @Override
     public void onAfterLoad(AfterLoadEvent event) {
-        DBObject dbObject = event.getDBObject();
+        Document document = event.getDocument();
 
         Node node = encrypted.get(event.getType());
         if (node == null) return;
 
-        cryptFields(dbObject, node, new Decoder());
+        cryptFields(document, node, new Decoder());
     }
 
     @Override
     public void onBeforeSave(BeforeSaveEvent event) {
-        DBObject dbObject = event.getDBObject();
+        Document document = event.getDocument();
 
         Node node = encrypted.get(event.getSource().getClass());
         if (node == null) return;
 
-        cryptFields(dbObject, node, new Encoder());
+        cryptFields(document, node, new Encoder());
     }
 
-    void cryptFields(DBObject dbObject, Node node, Function<Object, Object> crypt) {
-        if (node.type == Node.Type.MAP) {
-            Node mapChildren = node.children.get(0);
-            for (Object entry : ((BasicDBObject) dbObject).values()) {
-                cryptFields((DBObject) entry, mapChildren, crypt);
-            }
-            return;
 
-        } else if (node.type == Node.Type.LIST) {
-            Node mapChildren = node.children.get(0);
-            for (Object entry : (BasicDBList) dbObject) {
-                cryptFields((DBObject) entry, mapChildren, crypt);
+    void cryptFields(Object o, Node node, Function<Object, Object> crypt) {
+        if (o instanceof Document) {
+            if (node.type == Node.Type.MAP) {
+                cryptMap((Document) o, node, crypt);
+            } else {
+                cryptDocument((Document) o, node, crypt);
             }
-            return;
+        } else if (o instanceof List) {
+            cryptList((List) o, node, crypt);
+        } else {
+            throw new IllegalArgumentException("Unknown class field to crypt for field " + node.fieldName + ": " + o.getClass());
         }
+    }
 
+    void cryptList(List list, Node node, Function<Object, Object> crypt) {
+        if (node.type != Node.Type.LIST) throw new IllegalArgumentException("Expected list for " + node.fieldName + ", got " + node.type);
+
+        Node mapChildren = node.children.get(0);
+        for (Object entry : list) cryptFields(entry, mapChildren, crypt);
+    }
+
+    void cryptMap(Document document, Node node, Function<Object, Object> crypt) {
+        Node mapChildren = node.children.get(0);
+        for (Object entry : document.values()) {
+            cryptFields(entry, mapChildren, crypt);
+        }
+    }
+
+    void cryptDocument(Document document, Node node, Function<Object, Object> crypt) {
         for (Node childNode : node.children) {
-            Object value = dbObject.get(childNode.fieldName);
+            Object value = document.get(childNode.fieldName);
+
             if (value == null) continue;
 
             if (!childNode.children.isEmpty()) {
-                if (value instanceof BasicDBList) {
-                    for (Object o : (BasicDBList) value)
-                        cryptFields((DBObject) o, childNode.children.get(0), crypt);
+                if (value instanceof List) {
+                    for (Object o : (List) value) {
+                        cryptFields(o, childNode.children.get(0), crypt);
+                    }
                 } else {
-                    cryptFields((BasicDBObject) value, childNode, crypt);
+                    cryptFields(value, childNode, crypt);
                 }
                 return;
             }
 
-            dbObject.put(childNode.fieldName, crypt.apply(value));
+            document.put(childNode.fieldName, crypt.apply(value));
         }
     }
 }
