@@ -32,10 +32,8 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 @SpringBootTest(classes = {CachedMongoDBConfiguration.class})
 public class CryptVersionSystemTest {
 
-    @Autowired
-    MongoTemplate mongoTemplate;
-    @Autowired
-    CryptVault cryptVault;
+    @Autowired MongoTemplate mongoTemplate;
+    @Autowired CryptVault cryptVault;
 
     @Before
     public void setup() {

@@ -52,8 +52,7 @@ public abstract class EncryptSystemTest {
         assertThat(fromDb.secretBoolean, is(bean.secretBoolean));
         assertThat(fromDb.secretStringList, is(bean.secretStringList));
 
-        Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
-        DBObject fromMongo = new BasicDBObject(doc);
+        Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
         assertThat(fromMongo.get(MyBean.MONGO_NONSENSITIVEDATA), is(bean.nonSensitiveData));
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length() + 12);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
@@ -353,14 +352,14 @@ public abstract class EncryptSystemTest {
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
         assertThat(fromDb.nestedListList.get(0).get(1).secretString, is("one4"));
+        assertThat(fromDb.nestedListList.get(0).get(1).nonSensitiveData, is("one3"));
 
-        Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
-        DBObject fromMongo = new BasicDBObject(doc);
-        DBObject dbNestedListMap = (DBObject) fromMongo.get("nestedListList");
-        DBObject dbNestedList = (DBObject) dbNestedListMap.get("1");
-        DBObject dbBean = (DBObject) dbNestedList.get("1");
-        Object encryptedField = dbBean.get("secretString");
-        assertThat(encryptedField, is(instanceOf(byte[].class)));
+        Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
+        ArrayList nestedListList = (ArrayList) doc.get("nestedListList");
+        ArrayList nestedList = (ArrayList) nestedListList.get(1);
+        Document dbDoc = (Document) nestedList.get(0);
+        Object encryptedField = dbDoc.get("secretString");
+        assertThat(encryptedField, is(instanceOf(Binary.class)));
     }
 
     @Test
@@ -392,7 +391,7 @@ public abstract class EncryptSystemTest {
         assertThat(fromDb.ssn.someSecret, is(person.ssn.someSecret));
         assertThat(fromDb.ssn.ssn, is(person.ssn.ssn));
 
-        Document fromMongo = mongoTemplate.getCollection(Person.MONGO_PERSON).find(new BasicDBObject("_id", new ObjectId(person.id))).first();
+        Document fromMongo = mongoTemplate.getCollection(Person.MONGO_PERSON).find(new Document("_id", new ObjectId(person.id))).first();
         Document dbBean = (Document) fromMongo.get("ssn");
         Object encryptedField = dbBean.get("ssn");
         assertThat(encryptedField, is(instanceOf(Binary.class)));

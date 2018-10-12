@@ -1,6 +1,7 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.mongodb.MongoClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +27,11 @@ public abstract class MongoDBConfiguration extends AbstractMongoConfiguration {
     @Override
     protected Collection<String> getMappingBasePackages() {
         return Collections.singletonList(MongoDBConfiguration.class.getPackage().getName());
+    }
+
+    @Override
+    public MongoClient mongoClient() {
+        return new MongoClient("localhost", port);
     }
 
     @Bean

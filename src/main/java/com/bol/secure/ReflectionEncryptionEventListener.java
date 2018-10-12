@@ -21,43 +21,41 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
     }
 
     static void cryptFields(Document document, Class node, Function<Object, Object> crypt) {
-        for (String fieldName : document.keySet()) {
+        for (Map.Entry<String, Object> field : document.entrySet()) {
+            String fieldName = field.getKey();
             if (fieldName.equals("_class")) continue;
 
-            Field field = ReflectionUtils.findField(node, fieldName);
-            if (field == null) continue;
+            Field classField = ReflectionUtils.findField(node, fieldName);
+            if (classField == null) continue;
 
-            if (field.isAnnotationPresent(Encrypted.class)) {
+            Object fieldValue = field.getValue();
+
+            if (classField.isAnnotationPresent(Encrypted.class)) {
                 // direct encryption
-                Object value = document.get(fieldName);
-                document.put(fieldName, crypt.apply(value));
+                document.put(fieldName, crypt.apply(fieldValue));
 
             } else {
 
-                Class<?> fieldType = field.getType();
-
-                if (Collection.class.isAssignableFrom(fieldType)) {
-                    ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
+                if (Collection.class.isAssignableFrom(classField.getType())) {
+                    ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
                     Type subFieldType = parameterizedType.getActualTypeArguments()[0];
-                    ArrayList list = (ArrayList) document.get(fieldName);
+                    ArrayList list = (ArrayList) fieldValue;
                     for (Object o : list) {
                         diveIntoGeneric(crypt, o, subFieldType);
                     }
 
-                } else if (Map.class.isAssignableFrom(fieldType)) {
-                    ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
+                } else if (Map.class.isAssignableFrom(classField.getType())) {
+                    ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
                     Type subFieldType = parameterizedType.getActualTypeArguments()[1];
-                    Document map = (Document) document.get(fieldName);
+                    Document map = (Document) fieldValue;
                     for (String key : map.keySet()) {
                         diveIntoGeneric(crypt, map.get(key), subFieldType);
                     }
                 } else {
-                    Object o = document.get(fieldName);
-
-                    if (o instanceof Document) {
+                    if (fieldValue instanceof Document) {
                         // descending into sub-documents
-                        Document subObject = (Document) o;
-                        diveIntoGeneric(crypt, subObject, fieldType);
+                        Document subObject = (Document) fieldValue;
+                        diveIntoGeneric(crypt, subObject, classField.getType());
                     }
                 }
             }

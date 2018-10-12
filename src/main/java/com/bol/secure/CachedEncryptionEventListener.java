@@ -17,8 +17,7 @@ import java.util.function.Function;
 import static com.bol.reflection.ReflectionCache.processDocument;
 
 public class CachedEncryptionEventListener extends AbstractEncryptionEventListener {
-    @Autowired
-    MongoMappingContext mappingContext;
+    @Autowired MongoMappingContext mappingContext;
 
     Map<Class, Node> encrypted;
 
@@ -59,39 +58,33 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
 
     void cryptFields(Object o, Node node, Function<Object, Object> crypt) {
         if (o instanceof Document) {
-            cryptField((Document) o, node, crypt);
+            if (node.type == Node.Type.MAP) {
+                cryptMap((Document) o, node, crypt);
+            } else {
+                cryptDocument((Document) o, node, crypt);
+            }
         } else if (o instanceof List) {
-            cryptField((List) o, node, crypt);
+            cryptList((List) o, node, crypt);
         } else {
-            throw new IllegalArgumentException("Unknown class field to crypt " + o.getClass());
+            throw new IllegalArgumentException("Unknown class field to crypt for field " + node.fieldName + ": " + o.getClass());
         }
     }
 
-    void cryptField(List list, Node node, Function<Object, Object> crypt) {
-        if (node.type == Node.Type.LIST) {
+    void cryptList(List list, Node node, Function<Object, Object> crypt) {
+        if (node.type != Node.Type.LIST) throw new IllegalArgumentException("Expected list for " + node.fieldName + ", got " + node.type);
 
-            Node mapChildren = node.children.get(0);
-            for (Object entry : list) {
-                cryptFields(entry, mapChildren, crypt);
-            }
-            return;
-        } else {
-            throw new IllegalArgumentException("Unmatching node type for a List object " + node.type);
+        Node mapChildren = node.children.get(0);
+        for (Object entry : list) cryptFields(entry, mapChildren, crypt);
+    }
+
+    void cryptMap(Document document, Node node, Function<Object, Object> crypt) {
+        Node mapChildren = node.children.get(0);
+        for (Object entry : document.values()) {
+            cryptFields(entry, mapChildren, crypt);
         }
     }
 
-
-    void cryptField(Document document, Node node, Function<Object, Object> crypt) {
-        if (node.type == Node.Type.MAP) {
-
-            Node mapChildren = node.children.get(0);
-            for (Object entry : document.values()) {
-
-                cryptFields(entry, mapChildren, crypt);
-            }
-            return;
-
-        }
+    void cryptDocument(Document document, Node node, Function<Object, Object> crypt) {
         for (Node childNode : node.children) {
             Object value = document.get(childNode.fieldName);
 
@@ -111,5 +104,4 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
             document.put(childNode.fieldName, crypt.apply(value));
         }
     }
-
 }
