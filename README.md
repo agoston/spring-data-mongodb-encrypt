@@ -2,13 +2,11 @@
 [![Build Status](https://secure.travis-ci.org/bolcom/spring-data-mongodb-encrypt.svg)](http://travis-ci.org/bolcom/spring-data-mongodb-encrypt)
 
 
-spring-data-mongodb-encrypt
----------------------------
+#spring-data-mongodb-encrypt
 
 Allows any @Field to be marked with @Encrypted for per-field encryption.
 
-Features
---------
+##Features
 
 - integrates transparently into `spring-data-mongodb`
 - supports nested Collections, Maps and beans
@@ -20,8 +18,11 @@ Features
 - tested throughly
 - no dependencies
 
-For the impatient
------------------
+## Backwards compatibility
+
+Please use the [spring-data-1](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-1) branch, both for code and documentation.
+
+##For the impatient
 
 Add dependency:
 
@@ -29,7 +30,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>1.3.0</version>
+            <version>2.0.0</version>
         </dependency>
 ```
 
@@ -144,8 +145,7 @@ Example result in mongodb:
 }
 ```
 
-Polymorphism (and why it's bad)
--------------------------------
+##Polymorphism (and why it's bad)
 
 `spring-data-mongodb` supports polymorphism via a rather questionable mechanism: when the nested bean's type is not deductable from the java generic type, it would simply place an `_class` field in the document to specify the fully qualified class name for deserialization.
 This has some very serious drawbacks:
@@ -172,10 +172,9 @@ To circumvent the `_class` feature of `spring-data-mongodb`, install a custom mo
     }
 ```
 
-So OK, polymorphism is bad, but I really really want it!
---------------------------------------------------------
+##So OK, polymorphism is bad, but I really really want it!
 
-Version `1.3.0` of this library adds support for this. Simple replace the `CachedEncryptionEventListener` by `ReflectionEncryptionEventListener`: 
+Replace the `CachedEncryptionEventListener` by `ReflectionEncryptionEventListener`: 
 
 ```java
     @Bean
@@ -187,8 +186,7 @@ Version `1.3.0` of this library adds support for this. Simple replace the `Cache
 Note that using reflection at runtime will come at a performance cost and the drawbacks outlined above.
 
 
-Encrypt other data
-------------------
+##Encrypt other data
 
 It's perfectly possible to use the powerful encryption functionality of this library for custom purposes. Example:
 
@@ -235,8 +233,8 @@ If you want to use this library to encrypt arbitrary fields directly via mongo-d
     }
 ```
 
-Encrypting the whole document
----
+##Encrypting the whole document
+
 While it was not the use case for this library, it is very well possible to do whole document encryption with it.
 Since the `_id` field (and all the other key fields) always have to be readable by mongodb, the best approach is to extract all the indexed keys into the root of the object, and keep the rest of the data as an @Encrypted sub-document, e.g.:
 If you can't afford to reveal the keys, you could use a high-performing hash like Guava's murmur3 to hash the keys before exposing them, compound or independently.
@@ -255,8 +253,8 @@ public long otherId;
 public SecretData data;
 ```
 
-Expected size of encrypted field
----
+##Expected size of encrypted field
+
 The mongodb driver serializes every java object into BSON. Under the hood, we use the very same BSON serialization for maximum compatibility.
 
 You can expect the following extra sizes when you add an @Encrypted field:
