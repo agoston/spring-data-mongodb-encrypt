@@ -172,7 +172,7 @@ To circumvent the `_class` feature of `spring-data-mongodb`, install a custom mo
     }
 ```
 
-##So OK, polymorphism is bad, but I really really want it!
+## So OK, polymorphism is bad, but I really really want it!
 
 Replace the `CachedEncryptionEventListener` by `ReflectionEncryptionEventListener`: 
 
