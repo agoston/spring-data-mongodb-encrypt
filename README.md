@@ -34,7 +34,7 @@ Add dependency:
         </dependency>
 ```
 
-Configure spring:
+Configure spring (or see [how tests set up spring mongodb context](src/test/java/com/bol/system/MongoDBConfiguration.java)):
 
 ```java
 @Configuration
