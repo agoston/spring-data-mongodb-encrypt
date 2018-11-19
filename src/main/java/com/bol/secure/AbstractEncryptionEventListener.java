@@ -1,5 +1,6 @@
 package com.bol.secure;
 
+import com.bol.crypt.CryptOperationException;
 import com.bol.crypt.CryptVault;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -9,11 +10,17 @@ import org.springframework.data.mongodb.core.mapping.event.AbstractMongoEventLis
 
 import java.util.function.Function;
 
-public class AbstractEncryptionEventListener extends AbstractMongoEventListener {
+public class AbstractEncryptionEventListener<T> extends AbstractMongoEventListener {
     protected CryptVault cryptVault;
+    private boolean silentDecryptionFailure = false;
 
     public AbstractEncryptionEventListener(CryptVault cryptVault) {
         this.cryptVault = cryptVault;
+    }
+
+    public T withSilentDecryptionFailure(boolean silentDecryptionFailure) {
+        this.silentDecryptionFailure = silentDecryptionFailure;
+        return (T) this;
     }
 
     class Decoder extends BasicBSONDecoder implements Function<Object, Object> {
@@ -24,11 +31,16 @@ public class AbstractEncryptionEventListener extends AbstractMongoEventListener 
             else if (o instanceof byte[]) data = (byte[]) o;
             else throw new IllegalStateException("Got " + o.getClass() + ", expected: Binary or byte[]");
 
-            byte[] serialized = cryptVault.decrypt((data));
-            BSONCallback bsonCallback = new BasicDBObjectCallback();
-            decode(serialized, bsonCallback);
-            BSONObject deserialized = (BSONObject) bsonCallback.get();
-            return deserialized.get("");
+            try {
+                byte[] serialized = cryptVault.decrypt((data));
+                BSONCallback bsonCallback = new BasicDBObjectCallback();
+                decode(serialized, bsonCallback);
+                BSONObject deserialized = (BSONObject) bsonCallback.get();
+                return deserialized.get("");
+            } catch (CryptOperationException e) {
+                if (silentDecryptionFailure) return null;
+                throw e;
+            }
         }
     }
 

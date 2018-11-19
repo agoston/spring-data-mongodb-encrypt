@@ -16,7 +16,7 @@ import java.util.function.Function;
 
 import static com.bol.reflection.ReflectionCache.processDocument;
 
-public class CachedEncryptionEventListener extends AbstractEncryptionEventListener {
+public class CachedEncryptionEventListener extends AbstractEncryptionEventListener<CachedEncryptionEventListener> {
     @Autowired MongoMappingContext mappingContext;
 
     Map<Class, Node> encrypted;
@@ -54,7 +54,6 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
 
         cryptFields(document, node, new Encoder());
     }
-
 
     void cryptFields(Object o, Node node, Function<Object, Object> crypt) {
         if (o instanceof Document) {

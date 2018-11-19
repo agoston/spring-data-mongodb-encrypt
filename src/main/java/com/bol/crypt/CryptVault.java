@@ -102,7 +102,8 @@ public class CryptVault {
 
             return result;
         } catch (ShortBufferException | IllegalBlockSizeException | BadPaddingException | InvalidAlgorithmParameterException | InvalidKeyException e) {
-            throw new RuntimeException("JCE exception caught while encrypting with version " + version, e);
+            // wrap checked exception for easy use
+            throw new CryptOperationException("JCE exception caught while encrypting with version " + version, e);
         }
     }
 
@@ -119,7 +120,8 @@ public class CryptVault {
             cipher.init(Cipher.DECRYPT_MODE, cryptVersions[version].key, iv_spec);
             return cipher.doFinal(data, cryptVersion.saltLength + 1, data.length - cryptVersion.saltLength - 1);
         } catch (InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
-            throw new RuntimeException("JCE exception caught while decrypting with version " + version, e);
+            // wrap checked exception for easy use
+            throw new CryptOperationException("JCE exception caught while decrypting with key version " + version, e);
         }
     }
 

@@ -1,6 +1,9 @@
 package com.bol.system;
 
+import com.bol.crypt.CryptOperationException;
 import com.bol.crypt.CryptVault;
+import com.bol.crypt.CryptVersion;
+import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.system.model.Person;
 import com.bol.system.model.Ssn;
 import com.mongodb.BasicDBObject;
@@ -12,9 +15,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.*;
 
+import static com.bol.crypt.CryptVault.fromSignedByte;
+import static com.bol.system.MyBean.MONGO_NONSENSITIVEDATA;
+import static com.bol.system.MyBean.MONGO_SECRETSTRING;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -24,10 +32,9 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 // FIXME: BSON sizes test for map and set is a bit flaky, need to investigate exact on-disk binary format deeper
 public abstract class EncryptSystemTest {
 
-    @Autowired
-    MongoTemplate mongoTemplate;
-    @Autowired
-    CryptVault cryptVault;
+    @Autowired MongoTemplate mongoTemplate;
+    @Autowired CryptVault cryptVault;
+    @Autowired AbstractEncryptionEventListener abstractEncryptionEventListener;
 
     @Before
     public void cleanDb() {
@@ -403,5 +410,98 @@ public abstract class EncryptSystemTest {
         assertThat(encryptedInheritedFieldData, is(instanceOf(byte[].class)));
         Object noncryptedInheritedField = dbBean.get("notSecret");
         assertThat(noncryptedInheritedField, is(instanceOf(String.class)));
+    }
+
+    @Test(expected = CryptOperationException.class)
+    @DirtiesContext
+    public void checkWrongKey() {
+        // save to db, version = 0
+        MyBean bean = new MyBean();
+        bean.secretString = "secret";
+        bean.nonSensitiveData = getClass().getSimpleName();
+        mongoTemplate.insert(bean);
+
+        // override version 0's key
+        ReflectionTestUtils.setField(cryptVault, "cryptVersions", new CryptVersion[256]);
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
+
+        List<MyBean> all = mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+    }
+
+    @Test
+    @DirtiesContext
+    public void checkWrongKeySilentFailure() {
+        // save to db, version = 0
+        MyBean bean = new MyBean();
+        bean.secretString = "secret";
+        bean.nonSensitiveData = getClass().getSimpleName();
+        mongoTemplate.insert(bean);
+
+        // override version 0's key
+        ReflectionTestUtils.setField(cryptVault, "cryptVersions", new CryptVersion[256]);
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
+        abstractEncryptionEventListener.withSilentDecryptionFailure(true);
+
+        List<MyBean> all = mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        assertThat(all, hasSize(1));
+
+        assertThat(all.get(0).secretString, is(nullValue()));
+        assertThat(all.get(0).nonSensitiveData, is(notNullValue()));
+    }
+
+    @Test
+    @DirtiesContext
+    public void checkDefaultEncryptVersion() {
+        cryptVault
+                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(1, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="))
+                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(2, Base64.getDecoder().decode("IqWTpi549pJDZ1kuc9HppcMxtPfu2SP6Idlh+tz4LL4="));
+
+        // default key version should now be 2
+        byte[] result = cryptedResultInDb("1234");
+        assertThat(result.length, is(cryptVault.expectedCryptedLength(4 + 12)));
+        assertThat(fromSignedByte(result[0]), is(2));
+    }
+
+    @Test
+    @DirtiesContext
+    public void checkMultipleEncryptVersion() {
+        // default key version should now be 2
+        byte[] result1 = cryptedResultInDb("versioning test");
+
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(1, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
+        byte[] result2 = cryptedResultInDb("versioning test");
+
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(2, Base64.getDecoder().decode("IqWTpi549pJDZ1kuc9HppcMxtPfu2SP6Idlh+tz4LL4="));
+        byte[] result3 = cryptedResultInDb("versioning test");
+
+        assertThat(fromSignedByte(result1[0]), is(0));
+        assertThat(fromSignedByte(result2[0]), is(1));
+        assertThat(fromSignedByte(result3[0]), is(2));
+
+        // sanity check that all of the versions are encrypted
+        List<MyBean> all = mongoTemplate.find(query(where(MONGO_SECRETSTRING).is("versioning test")), MyBean.class);
+        assertThat(all, hasSize(0));
+
+        all = mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        assertThat(all, hasSize(3));
+
+        // check that all 3 different versions are decrypted
+        for (MyBean bean : all) {
+            assertThat(bean.secretString, is("versioning test"));
+        }
+    }
+
+    byte[] cryptedResultInDb(String value) {
+        MyBean bean = new MyBean();
+        bean.secretString = value;
+        bean.nonSensitiveData = getClass().getSimpleName();
+        mongoTemplate.insert(bean);
+
+        Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
+        Object cryptedSecret = fromMongo.get(MONGO_SECRETSTRING);
+        assertThat(cryptedSecret, is(instanceOf(Binary.class)));
+        Object cryptedSecretData = ((Binary) cryptedSecret).getData();
+        assertThat(cryptedSecretData, is(instanceOf(byte[].class)));
+        return (byte[]) cryptedSecretData;
     }
 }

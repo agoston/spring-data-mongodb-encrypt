@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-public class ReflectionEncryptionEventListener extends AbstractEncryptionEventListener {
+public class ReflectionEncryptionEventListener extends AbstractEncryptionEventListener<ReflectionEncryptionEventListener> {
     public ReflectionEncryptionEventListener(CryptVault cryptVault) {
         super(cryptVault);
     }
