@@ -185,6 +185,19 @@ Replace the `CachedEncryptionEventListener` by `ReflectionEncryptionEventListene
 
 Note that using reflection at runtime will come at a performance cost and the drawbacks outlined above.
 
+## Ignore decryption failures
+
+Sometimes (see #17) it is useful to bypass the otherwise rigid decryption framework and allow for a best-effort reading of mongodb documents. Using the `EncryptionEventListener.withSilentDecryptionFailure(true)` allows to bypass these failures and leave the failing fields empty. Example:
+
+```java
+    @Bean
+    public CachedEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
+        return new CachedEncryptionEventListener(cryptVault)
+                .withSilentDecryptionFailure(true);
+    }
+```
+
+It is also possible to autowire EncryptionEventListener and change this setting on-the-fly.
 
 ## Encrypt other data
 
@@ -232,20 +245,6 @@ If you want to use this library to encrypt arbitrary fields directly via mongo-d
         return new String(decrypted);
     }
 ```
-
-## Ignore decryption failures
-
-Sometimes (see #17) it is useful to bypass the otherwise rigid decryption framework and allow for a best-effort reading of mongodb documents. Using the `EncryptionEventListener.withSilentDecryptionFailure(true)` allows to bypass these failures and leave the failing fields empty. Example:
-
-```java
-    @Bean
-    public CachedEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
-        return new CachedEncryptionEventListener(cryptVault)
-                .withSilentDecryptionFailure(true);
-    }
-```
-
-It is also possible to autowire EncryptionEventListener and change this setting on-the-fly.
 
 ## Encrypting the whole document
 
