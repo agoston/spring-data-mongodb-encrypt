@@ -30,7 +30,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>2.0.0</version>
+            <version>2.1.0</version>
         </dependency>
 ```
 
@@ -232,6 +232,20 @@ If you want to use this library to encrypt arbitrary fields directly via mongo-d
         return new String(decrypted);
     }
 ```
+
+## Ignore decryption failures
+
+Sometimes (see #17) it is useful to bypass the otherwise rigid decryption framework and allow for a best-effort reading of mongodb documents. Using the `EncryptionEventListener.withSilentDecryptionFailure(true)` allows to bypass these failures and leave the failing fields empty. Example:
+
+```java
+    @Bean
+    public CachedEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
+        return new CachedEncryptionEventListener(cryptVault)
+                .withSilentDecryptionFailure(true);
+    }
+```
+
+It is also possible to autowire EncryptionEventListener and change this setting on-the-fly.
 
 ## Encrypting the whole document
 
