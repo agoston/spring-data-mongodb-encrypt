@@ -20,7 +20,7 @@ public class ReflectionCache {
     public static List<Node> processDocument(Class objectClass) {
         List<Node> result = cyclicClassReference.get(objectClass);
         if (result != null) {
-            LOG.info("cyclic reference found; " + objectClass.getName() + " is already mapped");
+            LOG.trace("cyclic reference found; {} is already mapped", objectClass.getName());
             return result;
         }
 
