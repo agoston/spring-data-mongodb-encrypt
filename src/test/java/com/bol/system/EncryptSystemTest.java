@@ -1,8 +1,6 @@
 package com.bol.system;
 
-import com.bol.crypt.CryptOperationException;
-import com.bol.crypt.CryptVault;
-import com.bol.crypt.CryptVersion;
+import com.bol.crypt.*;
 import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.system.model.Person;
 import com.bol.system.model.Ssn;
@@ -24,8 +22,7 @@ import static com.bol.crypt.CryptVault.fromSignedByte;
 import static com.bol.system.MyBean.MONGO_NONSENSITIVEDATA;
 import static com.bol.system.MyBean.MONGO_SECRETSTRING;
 import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
@@ -412,7 +409,7 @@ public abstract class EncryptSystemTest {
         assertThat(noncryptedInheritedField, is(instanceOf(String.class)));
     }
 
-    @Test(expected = CryptOperationException.class)
+    @Test(expected = DocumentCryptException.class)
     @DirtiesContext
     public void checkWrongKey() {
         // save to db, version = 0
@@ -425,7 +422,57 @@ public abstract class EncryptSystemTest {
         ReflectionTestUtils.setField(cryptVault, "cryptVersions", new CryptVersion[256]);
         cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
 
-        List<MyBean> all = mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        try {
+            mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        } catch (DocumentCryptException e) {
+            assertCryptException(e, "mybean", null, "secretString");
+            throw e;
+        }
+    }
+
+    @Test(expected = DocumentCryptException.class)
+    @DirtiesContext
+    public void checkWrongKeyDeep() {
+        // save to db, version = 0
+        MyBean bean = new MyBean();
+        bean.nonSensitiveSubBean = new MySubBean();
+        bean.nonSensitiveSubBean.secretString = "secret";
+        bean.nonSensitiveData = getClass().getSimpleName();
+        mongoTemplate.insert(bean);
+
+        // override version 0's key
+        ReflectionTestUtils.setField(cryptVault, "cryptVersions", new CryptVersion[256]);
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
+
+        try {
+            mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        } catch (DocumentCryptException e) {
+            assertCryptException(e, "mybean", null, "nonSensitiveSubBean.secretString");
+            throw e;
+        }
+    }
+
+    @Test(expected = DocumentCryptException.class)
+    @DirtiesContext
+    public void checkWrongKeyDeepList() {
+        // save to db, version = 0
+        MyBean bean = new MyBean();
+        bean.nonSensitiveSubBeanList = new ArrayList<>();
+        bean.nonSensitiveSubBeanList.add(new MySubBean());
+        bean.nonSensitiveSubBeanList.get(0).secretString = "secret";
+        bean.nonSensitiveData = getClass().getSimpleName();
+        mongoTemplate.insert(bean);
+
+        // override version 0's key
+        ReflectionTestUtils.setField(cryptVault, "cryptVersions", new CryptVersion[256]);
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
+
+        try {
+            mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        } catch (DocumentCryptException e) {
+            assertCryptException(e, "mybean", null, "nonSensitiveSubBeanList.0.secretString");
+            throw e;
+        }
     }
 
     @Test
@@ -503,5 +550,21 @@ public abstract class EncryptSystemTest {
         Object cryptedSecretData = ((Binary) cryptedSecret).getData();
         assertThat(cryptedSecretData, is(instanceOf(byte[].class)));
         return (byte[]) cryptedSecretData;
+    }
+
+    static void assertCryptException(Exception e, String collectionName, ObjectId objectId, String fieldName) {
+        assertThat(e, instanceOf(DocumentCryptException.class));
+        DocumentCryptException dce = (DocumentCryptException) e;
+        assertThat(dce.getCollectionName(), is(collectionName));
+        if (objectId != null) assertThat(dce.getId(), is(objectId));
+        else assertNotNull(dce.getId());
+
+        Throwable dceCause = dce.getCause();
+        assertThat(dceCause, instanceOf(FieldCryptException.class));
+        FieldCryptException fce = (FieldCryptException) dceCause;
+        assertThat(fce.getMessage(), is(fieldName));
+
+        Throwable fceCause = fce.getCause();
+        assertThat(fceCause, instanceOf(CryptOperationException.class));
     }
 }

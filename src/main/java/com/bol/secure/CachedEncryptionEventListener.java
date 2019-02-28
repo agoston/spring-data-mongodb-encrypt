@@ -1,8 +1,11 @@
 package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
+import com.bol.crypt.DocumentCryptException;
+import com.bol.crypt.FieldCryptException;
 import com.bol.reflection.Node;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
@@ -42,7 +45,12 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         Node node = encrypted.get(event.getType());
         if (node == null) return;
 
-        cryptFields(document, node, new Decoder());
+        try {
+            cryptFields(document, node, new Decoder());
+        } catch (Exception e) {
+            ObjectId id = document.getObjectId("_id");
+            throw new DocumentCryptException(event.getCollectionName(), id, e);
+        }
     }
 
     @Override
@@ -52,20 +60,35 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         Node node = encrypted.get(event.getSource().getClass());
         if (node == null) return;
 
-        cryptFields(document, node, new Encoder());
+        try {
+            cryptFields(document, node, new Encoder());
+        } catch (Exception e) {
+            ObjectId id = document.getObjectId("_id");
+            throw new DocumentCryptException(event.getCollectionName(), id, e);
+        }
     }
 
     void cryptFields(Object o, Node node, Function<Object, Object> crypt) {
-        if (o instanceof Document) {
-            if (node.type == Node.Type.MAP) {
-                cryptMap((Document) o, node, crypt);
-            } else {
-                cryptDocument((Document) o, node, crypt);
+        try {
+            switch (node.type) {
+                case MAP:
+                    cryptMap((Document) o, node, crypt);
+                    break;
+
+                case DOCUMENT:
+                case ROOT:
+                    cryptDocument((Document) o, node, crypt);
+                    break;
+
+                case LIST:
+                    cryptList((List) o, node, crypt);
+                    break;
+
+                default:
+                    throw new IllegalArgumentException("Unknown class field to crypt for field " + node.fieldName + ": " + o.getClass());
             }
-        } else if (o instanceof List) {
-            cryptList((List) o, node, crypt);
-        } else {
-            throw new IllegalArgumentException("Unknown class field to crypt for field " + node.fieldName + ": " + o.getClass());
+        } catch (ClassCastException e) {
+            throw new FieldCryptException(node.fieldName, e);
         }
     }
 
@@ -73,34 +96,44 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         if (node.type != Node.Type.LIST) throw new IllegalArgumentException("Expected list for " + node.fieldName + ", got " + node.type);
 
         Node mapChildren = node.children.get(0);
-        for (Object entry : list) cryptFields(entry, mapChildren, crypt);
+        for (int i = 0; i < list.size(); i++) {
+            try {
+                cryptFields(list.get(i), mapChildren, crypt);
+            } catch (FieldCryptException e) {
+                throw e.chain(Integer.toString(i));
+            }
+        }
     }
 
     void cryptMap(Document document, Node node, Function<Object, Object> crypt) {
         Node mapChildren = node.children.get(0);
-        for (Object entry : document.values()) {
-            cryptFields(entry, mapChildren, crypt);
+        for (Map.Entry<String, Object> entry : document.entrySet()) {
+            try {
+                cryptFields(entry.getValue(), mapChildren, crypt);
+            } catch (FieldCryptException e) {
+                throw e.chain(entry.getKey());
+            }
         }
     }
 
     void cryptDocument(Document document, Node node, Function<Object, Object> crypt) {
         for (Node childNode : node.children) {
             Object value = document.get(childNode.fieldName);
-
             if (value == null) continue;
 
-            if (!childNode.children.isEmpty()) {
-                if (value instanceof List) {
-                    for (Object o : (List) value) {
-                        cryptFields(o, childNode.children.get(0), crypt);
-                    }
-                } else {
-                    cryptFields(value, childNode, crypt);
+            if (childNode.type == Node.Type.DIRECT) {
+                try {
+                    document.put(childNode.fieldName, crypt.apply(value));
+                } catch (Exception e) {
+                    throw new FieldCryptException(childNode.fieldName, e);
                 }
-                return;
+            } else {
+                try {
+                    cryptFields(value, childNode, crypt);
+                } catch (FieldCryptException e) {
+                    throw e.chain(childNode.fieldName);
+                }
             }
-
-            document.put(childNode.fieldName, crypt.apply(value));
         }
     }
 }
