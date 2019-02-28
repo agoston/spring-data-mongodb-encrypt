@@ -1,7 +1,10 @@
 package com.bol.secure;
 
 import com.bol.crypt.CryptVault;
+import com.bol.crypt.DocumentCryptException;
+import com.bol.crypt.FieldCryptException;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 import org.springframework.util.ReflectionUtils;
@@ -32,31 +35,47 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
 
             if (classField.isAnnotationPresent(Encrypted.class)) {
                 // direct encryption
-                document.put(fieldName, crypt.apply(fieldValue));
+                try {
+                    document.put(fieldName, crypt.apply(fieldValue));
+                } catch (Exception e) {
+                    throw new FieldCryptException(fieldName, e);
+                }
 
             } else {
 
-                if (Collection.class.isAssignableFrom(classField.getType())) {
-                    ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
-                    Type subFieldType = parameterizedType.getActualTypeArguments()[0];
-                    ArrayList list = (ArrayList) fieldValue;
-                    for (Object o : list) {
-                        diveIntoGeneric(crypt, o, subFieldType);
-                    }
+                try {
+                    if (Collection.class.isAssignableFrom(classField.getType())) {
+                        ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
+                        Type subFieldType = parameterizedType.getActualTypeArguments()[0];
+                        ArrayList list = (ArrayList) fieldValue;
+                        for (int i = 0; i < list.size(); i++) {
+                            try {
+                                diveIntoGeneric(crypt, list.get(i), subFieldType);
+                            } catch (FieldCryptException e) {
+                                throw e.chain(Integer.toString(i));
+                            }
+                        }
 
-                } else if (Map.class.isAssignableFrom(classField.getType())) {
-                    ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
-                    Type subFieldType = parameterizedType.getActualTypeArguments()[1];
-                    Document map = (Document) fieldValue;
-                    for (String key : map.keySet()) {
-                        diveIntoGeneric(crypt, map.get(key), subFieldType);
+                    } else if (Map.class.isAssignableFrom(classField.getType())) {
+                        ParameterizedType parameterizedType = (ParameterizedType) classField.getGenericType();
+                        Type subFieldType = parameterizedType.getActualTypeArguments()[1];
+                        Document map = (Document) fieldValue;
+                        for (Map.Entry<String, Object> entry : map.entrySet()) {
+                            try {
+                                diveIntoGeneric(crypt, entry.getValue(), subFieldType);
+                            } catch (FieldCryptException e) {
+                                throw e.chain(entry.getKey());
+                            }
+                        }
+                    } else {
+                        if (fieldValue instanceof Document) {
+                            // descending into sub-documents
+                            Document subObject = (Document) fieldValue;
+                            diveIntoGeneric(crypt, subObject, classField.getType());
+                        }
                     }
-                } else {
-                    if (fieldValue instanceof Document) {
-                        // descending into sub-documents
-                        Document subObject = (Document) fieldValue;
-                        diveIntoGeneric(crypt, subObject, classField.getType());
-                    }
+                } catch (FieldCryptException e) {
+                    throw e.chain(fieldName);
                 }
             }
         }
@@ -122,13 +141,22 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
     @Override
     public void onAfterLoad(AfterLoadEvent event) {
         Document document = event.getDocument();
-        cryptFields(document, event.getType(), new Decoder());
+        try {
+            cryptFields(document, event.getType(), new Decoder());
+        } catch (Exception e) {
+            ObjectId id = document.getObjectId("_id");
+            throw new DocumentCryptException(event.getCollectionName(), id, e);
+        }
     }
 
     @Override
     public void onBeforeSave(BeforeSaveEvent event) {
         Document document = event.getDocument();
-        cryptFields(document, event.getSource().getClass(), new Encoder());
-
+        try {
+            cryptFields(document, event.getSource().getClass(), new Encoder());
+        } catch (Exception e) {
+            ObjectId id = document.getObjectId("_id");
+            throw new DocumentCryptException(event.getCollectionName(), id, e);
+        }
     }
 }
