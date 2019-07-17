@@ -187,7 +187,7 @@ Note that using reflection at runtime will come at a performance cost and the dr
 
 ## Ignore decryption failures
 
-Sometimes (see https://github.com/bolcom/spring-data-mongodb-encrypt/issues/17) it is useful to bypass the otherwise rigid decryption framework and allow for a best-effort reading of mongodb documents. Using the `EncryptionEventListener.withSilentDecryptionFailure(true)` allows to bypass these failures and leave the failing fields empty. Example:
+Sometimes (see #17) it is useful to bypass the otherwise rigid decryption framework and allow for a best-effort reading of mongodb documents. Using the `EncryptionEventListener.withSilentDecryptionFailure(true)` allows to bypass these failures and leave the failing fields empty. Example:
 
 ```java
     @Bean
