@@ -266,6 +266,13 @@ public long otherId;
 public SecretData data;
 ```
 
+## Encrypting an indexed field
+
+Since this library encrypts data *before* it is sent to mongodb, there is no point in indexing an encrypted field. However, an approach that worked remarkably well in the past was to put a calculated field next to the encrypted one that contains the hashed value (e.g. Guava's murmur3) of the encrypted field.
+
+When searching by index, create a hash of the lookup key and search with that against the hashed field. Normally, you'd have 0 (if not exists) or 1 (exists) hits. However, because hashing can result in collisions, you also have to process the case of more than 1 hits, in which case you'd have to load all the matching documents (during which the encrypted field is decrypted by this library), and compare the now-decrypted field to find your exact match.
+
+
 ## Expected size of encrypted field
 
 The mongodb driver serializes every java object into BSON. Under the hood, we use the very same BSON serialization for maximum compatibility.
