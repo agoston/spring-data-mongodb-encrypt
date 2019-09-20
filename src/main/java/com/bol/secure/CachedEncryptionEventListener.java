@@ -7,11 +7,11 @@ import com.bol.reflection.Node;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.mapping.BasicMongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 
-import javax.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,19 +22,20 @@ import static com.bol.reflection.ReflectionCache.processDocument;
 public class CachedEncryptionEventListener extends AbstractEncryptionEventListener<CachedEncryptionEventListener> {
     @Autowired MongoMappingContext mappingContext;
 
-    Map<Class, Node> encrypted;
+    HashMap<Class, Node> encrypted = new HashMap<>();
 
     public CachedEncryptionEventListener(CryptVault cryptVault) {
         super(cryptVault);
     }
 
-    @PostConstruct
-    public void initReflection() {
-        encrypted = new HashMap<>();
+    Node node(Class clazz) {
+        return encrypted.computeIfAbsent(clazz, c -> {
+            BasicMongoPersistentEntity<?> entity = mappingContext.getPersistentEntity(c);
+            if (entity == null) return Node.EMPTY;
 
-        mappingContext.getPersistentEntities().forEach(entity -> {
             List<Node> children = processDocument(entity.getType());
-            if (!children.isEmpty()) encrypted.put(entity.getType(), new Node("", children, Node.Type.ROOT));
+            if (!children.isEmpty()) return new Node("", children, Node.Type.ROOT);
+            return Node.EMPTY;
         });
     }
 
@@ -42,8 +43,8 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
     public void onAfterLoad(AfterLoadEvent event) {
         Document document = event.getDocument();
 
-        Node node = encrypted.get(event.getType());
-        if (node == null) return;
+        Node node = node(event.getType());
+        if (node == Node.EMPTY) return;
 
         try {
             cryptFields(document, node, new Decoder());
@@ -57,8 +58,8 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
     public void onBeforeSave(BeforeSaveEvent event) {
         Document document = event.getDocument();
 
-        Node node = encrypted.get(event.getSource().getClass());
-        if (node == null) return;
+        Node node = node(event.getSource().getClass());
+        if (node == Node.EMPTY) return;
 
         try {
             cryptFields(document, node, new Encoder());

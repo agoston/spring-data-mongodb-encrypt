@@ -25,4 +25,6 @@ public class Node {
         /** field is a sub-document, descend */
         DOCUMENT
     }
+
+    public static final Node EMPTY = new Node(null, null, null);
 }
