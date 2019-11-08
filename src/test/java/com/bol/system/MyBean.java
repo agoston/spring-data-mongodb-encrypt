@@ -49,6 +49,9 @@ public class MyBean {
     public MySubBean secretSubBean;
 
     @Field
+    public List<String> publicStringList;
+
+    @Field
     @Encrypted
     public List<String> secretStringList;
 

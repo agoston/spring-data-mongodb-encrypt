@@ -87,8 +87,11 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
             diveInto(crypt, (Document) value, fieldType);
         else if (value instanceof List)
             diveInto(crypt, (List) value, fieldType);
+        else if (value.getClass().getPackage().getName().equals("java.lang"))
+            // primitive type, nothing to do here
+            return;
         else
-            throw new IllegalArgumentException("Unknown reflective value class " + value.getClass());
+            throw new IllegalArgumentException("Unknown reflective value class: " + value.getClass());
     }
 
 

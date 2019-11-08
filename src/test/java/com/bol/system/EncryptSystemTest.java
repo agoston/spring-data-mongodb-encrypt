@@ -46,6 +46,7 @@ public abstract class EncryptSystemTest {
         bean.secretLong = 95459L;
         bean.secretBoolean = true;
         bean.secretStringList = Arrays.asList("ear", "all", "I truly am a very very long string. I truly am a very very long string. I truly am a very very long string.");
+        bean.publicStringList = Arrays.asList("ear", "all");
         mongoTemplate.save(bean);
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
