@@ -35,7 +35,7 @@ public final class JCEPolicy {
 
             field.set(null, false);
         } catch (IllegalAccessException | NoSuchFieldException | ClassNotFoundException e) {
-            LOG.info("Exception caught while trying to open JCE via reflection", e);
+            LOG.trace("Exception caught while trying to open JCE via reflection", e);
         }
     }
 }
