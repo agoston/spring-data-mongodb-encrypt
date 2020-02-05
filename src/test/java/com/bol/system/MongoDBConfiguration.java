@@ -1,18 +1,19 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
-import com.mongodb.MongoClient;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.mongodb.config.AbstractMongoConfiguration;
+import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
 
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 
 @Configuration
-public abstract class MongoDBConfiguration extends AbstractMongoConfiguration {
+public abstract class MongoDBConfiguration extends AbstractMongoClientConfiguration {
 
     private static final byte[] secretKey = Base64.getDecoder().decode("hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=");
 
@@ -31,7 +32,8 @@ public abstract class MongoDBConfiguration extends AbstractMongoConfiguration {
 
     @Override
     public MongoClient mongoClient() {
-        return new MongoClient("localhost", port);
+        String connectionString = "mongodb://localhost:" + port;
+        return MongoClients.create(connectionString);
     }
 
     @Bean
