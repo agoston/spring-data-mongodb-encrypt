@@ -38,7 +38,7 @@ Configure spring (or see [how tests set up spring mongodb context](src/test/java
 
 ```java
 @Configuration
-public class MongoDBConfiguration extends AbstractMongoConfiguration {
+public class MongoDBConfiguration extends AbstractMongoClientConfiguration {
 
     // normally you would use @Value to wire a property here
     private static final byte[] secretKey = Base64.getDecoder().decode("hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=");
@@ -50,9 +50,8 @@ public class MongoDBConfiguration extends AbstractMongoConfiguration {
     }
 
     @Override
-    @Bean
-    public Mongo mongo() throws Exception {
-        return new MongoClient();
+    public MongoClient mongoClient() {
+        return MongoClients.create();
     }
 
     @Bean
