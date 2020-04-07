@@ -30,45 +30,20 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>2.3.2</version>
+            <version>2.4.2</version>
         </dependency>
 ```
 
-Configure spring (or see [how tests set up spring mongodb context](src/test/java/com/bol/system/MongoDBConfiguration.java)):
+And add the following to your `application.yml`:
 
-```java
-@Configuration
-public class MongoDBConfiguration extends AbstractMongoClientConfiguration {
-
-    // normally you would use @Value to wire a property here
-    private static final byte[] secretKey = Base64.getDecoder().decode("hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=");
-    private static final byte[] oldKey = Base64.getDecoder().decode("cUzurmCcL+K252XDJhhWI/A/+wxYXLgIm678bwsE2QM=");
-
-    @Override
-    protected String getDatabaseName() {
-        return "test";
-    }
-
-    @Override
-    public MongoClient mongoClient() {
-        return MongoClients.create();
-    }
-
-    @Bean
-    public CryptVault cryptVault() {
-        return new CryptVault()
-                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, oldKey)
-                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(1, secretKey)
-                // can be omitted if it's the highest version
-                .withDefaultKeyVersion(1);
-    }
-
-    @Bean
-    public CachedEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
-        return new CachedEncryptionEventListener(cryptVault);
-    }
-}
+```yaml
+mongodb.encrypt:
+  keys:
+    - version: 1
+      key: hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=
 ```
+
+And you're done!
 
 Example usage:
 
@@ -144,6 +119,45 @@ Example result in mongodb:
 }
 ```
 
+## Manual configuration
+
+An example if you need to manually configure spring (see also [how tests set up spring mongodb context](src/test/java/com/bol/system/MongoDBConfiguration.java)):
+
+```java
+@Configuration
+public class MongoDBConfiguration extends AbstractMongoClientConfiguration {
+
+    // normally you would use @Value to wire a property here
+    private static final byte[] secretKey = Base64.getDecoder().decode("hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=");
+    private static final byte[] oldKey = Base64.getDecoder().decode("cUzurmCcL+K252XDJhhWI/A/+wxYXLgIm678bwsE2QM=");
+
+    @Override
+    protected String getDatabaseName() {
+        return "test";
+    }
+
+    @Override
+    public MongoClient mongoClient() {
+        return MongoClients.create();
+    }
+
+    @Bean
+    public CryptVault cryptVault() {
+        return new CryptVault()
+                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, oldKey)
+                .with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(1, secretKey)
+                // can be omitted if it's the highest version
+                .withDefaultKeyVersion(1);
+    }
+
+    @Bean
+    public CachedEncryptionEventListener encryptionEventListener(CryptVault cryptVault) {
+        return new CachedEncryptionEventListener(cryptVault);
+    }
+}
+```
+
+
 ## Polymorphism (and why it's bad)
 
 `spring-data-mongodb` supports polymorphism via a rather questionable mechanism: when the nested bean's type is not deductable from the java generic type, it would simply place an `_class` field in the document to specify the fully qualified class name for deserialization.
@@ -182,6 +196,13 @@ Replace the `CachedEncryptionEventListener` by `ReflectionEncryptionEventListene
     }
 ```
 
+or via `application.yml`:
+
+```yaml
+mongodb.encrypt:
+  type: reflection
+```
+
 Note that using reflection at runtime will come at a performance cost and the drawbacks outlined above.
 
 ## Ignore decryption failures
@@ -196,7 +217,41 @@ Sometimes (see #17) it is useful to bypass the otherwise rigid decryption framew
     }
 ```
 
+or, via `application.yml`:
+```yaml
+mongodb.encrypt:
+  silent-decryption-failures: true
+```
+
 It is also possible to autowire EncryptionEventListener and change this setting on-the-fly.
+
+# Keys
+
+This library supports AES 256 bit keys out of the box. It's possible to extend this, check the source code (`CryptVault` specifically) on how to do so.
+
+To generate a key, you can use the following command line:
+
+```
+dd if=/dev/urandom bs=1 count=32 | base64
+```
+
+## Exchange keys
+
+It is advisable to rotate your keys every now and then. To do so, define a new key version in `application.yml`:
+
+```yaml
+mongodb.encrypt:
+  keys:
+    - version: 1
+      key: hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=
+    - version: 2
+      key: ge2L+MA9jLA8UiUJ4z5fUoK+Lgj2yddlL6EzYIBqb1Q=
+```  
+
+`spring-data-mongodb-encrypt` would automatically use the highest versioned key for encryption by default, by understand/support decryption of all
+older keys as well. This allows you to deploy a new key, and either let old data slowly get phased out, or run a nightly load+save batch job to do
+key migration. Once all old keys are phased out, you may remove the old key from the configuration.
+
 
 ## Encrypt other data
 

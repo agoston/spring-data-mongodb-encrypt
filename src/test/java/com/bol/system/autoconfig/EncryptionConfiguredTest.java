@@ -2,6 +2,7 @@ package com.bol.system.autoconfig;
 
 import com.bol.config.EncryptAutoConfiguration;
 import com.bol.crypt.CryptVault;
+import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.secure.CachedEncryptionEventListener;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -20,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class EncryptionConfiguredTest {
 
     @Autowired(required = false) CryptVault cryptVault;
-    @Autowired(required = false) CachedEncryptionEventListener eventListener;
+    @Autowired(required = false) AbstractEncryptionEventListener eventListener;
 
     @Test
     public void sanityTest() {

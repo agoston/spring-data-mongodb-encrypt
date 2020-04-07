@@ -1,4 +1,7 @@
 mongodb.encrypt:
+  default-key: 1
+  type: REFLECTION
+  silent-decryption-failures: true
   keys:
     - version: 1
       key: hqHKBLV83LpCqzKpf8OvutbCs+O5wX5BPu3btWpEvXA=
