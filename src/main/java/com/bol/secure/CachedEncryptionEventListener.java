@@ -12,9 +12,9 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import static com.bol.reflection.ReflectionCache.processDocument;
@@ -22,7 +22,7 @@ import static com.bol.reflection.ReflectionCache.processDocument;
 public class CachedEncryptionEventListener extends AbstractEncryptionEventListener<CachedEncryptionEventListener> {
     @Autowired MongoMappingContext mappingContext;
 
-    HashMap<Class, Node> encrypted = new HashMap<>();
+    Map<Class, Node> encrypted = new ConcurrentHashMap<>();
 
     public CachedEncryptionEventListener(CryptVault cryptVault) {
         super(cryptVault);

@@ -3,6 +3,7 @@ package com.bol.reflection;
 import com.bol.secure.Encrypted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.ConcurrentReferenceHashMap;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Field;
@@ -15,7 +16,7 @@ public class ReflectionCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);
 
-    private static Map<Class, List<Node>> cyclicClassReference = new HashMap<>();
+    private static Map<Class, List<Node>> cyclicClassReference = new ConcurrentReferenceHashMap<>();
 
     public static List<Node> processDocument(Class objectClass) {
         List<Node> result = cyclicClassReference.get(objectClass);
