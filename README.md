@@ -225,7 +225,7 @@ mongodb.encrypt:
 
 It is also possible to autowire EncryptionEventListener and change this setting on-the-fly.
 
-# Keys
+## Keys
 
 This library supports AES 256 bit keys out of the box. It's possible to extend this, check the source code (`CryptVault` specifically) on how to do so.
 
