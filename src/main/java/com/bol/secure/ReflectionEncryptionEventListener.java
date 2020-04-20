@@ -4,7 +4,6 @@ import com.bol.crypt.CryptVault;
 import com.bol.crypt.DocumentCryptException;
 import com.bol.crypt.FieldCryptException;
 import org.bson.Document;
-import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 import org.springframework.util.ReflectionUtils;
@@ -147,7 +146,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         try {
             cryptFields(document, event.getType(), new Decoder());
         } catch (Exception e) {
-            ObjectId id = document.getObjectId("_id");
+            Object id = document.get("_id");
             throw new DocumentCryptException(event.getCollectionName(), id, e);
         }
     }
@@ -158,7 +157,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         try {
             cryptFields(document, event.getSource().getClass(), new Encoder());
         } catch (Exception e) {
-            ObjectId id = document.getObjectId("_id");
+            Object id = document.get("_id");
             throw new DocumentCryptException(event.getCollectionName(), id, e);
         }
     }

@@ -1,18 +1,16 @@
 package com.bol.crypt;
 
-import org.bson.types.ObjectId;
-
 public class DocumentCryptException extends RuntimeException {
-    ObjectId id;
+    Object id;
     String collectionName;
 
-    public DocumentCryptException(String collectionName, ObjectId id, Throwable e) {
-        super("Collection: " + collectionName + ", ObjectId: " + id, e);
+    public DocumentCryptException(String collectionName, Object id, Throwable e) {
+        super("Collection: " + collectionName + ", Id: " + id, e);
         this.id = id;
         this.collectionName = collectionName;
     }
 
-    public ObjectId getId() {
+    public Object getId() {
         return id;
     }
 
