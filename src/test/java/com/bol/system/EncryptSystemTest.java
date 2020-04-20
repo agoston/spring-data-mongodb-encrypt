@@ -433,6 +433,28 @@ public abstract class EncryptSystemTest {
 
     @Test(expected = DocumentCryptException.class)
     @DirtiesContext
+    public void checkWrongKeyCustomId() {
+        // save to db, version = 0
+        MyBean bean = new MyBean();
+        bean.id = "customId";
+        bean.secretString = "secret";
+        bean.nonSensitiveData = getClass().getSimpleName();
+        mongoTemplate.insert(bean);
+
+        // override version 0's key
+        ReflectionTestUtils.setField(cryptVault, "cryptVersions", new CryptVersion[256]);
+        cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(0, Base64.getDecoder().decode("aic7QGYCCSHyy7gYRCyNTpPThbomw1/dtWl4bocyTnU="));
+
+        try {
+            mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
+        } catch (DocumentCryptException e) {
+            assertCryptException(e, "mybean", null, "secretString");
+            throw e;
+        }
+    }
+
+    @Test(expected = DocumentCryptException.class)
+    @DirtiesContext
     public void checkWrongKeyDeep() {
         // save to db, version = 0
         MyBean bean = new MyBean();
