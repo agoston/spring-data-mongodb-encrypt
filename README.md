@@ -248,9 +248,16 @@ mongodb.encrypt:
       key: ge2L+MA9jLA8UiUJ4z5fUoK+Lgj2yddlL6EzYIBqb1Q=
 ```  
 
-`spring-data-mongodb-encrypt` would automatically use the highest versioned key for encryption by default, by understand/support decryption of all
-older keys as well. This allows you to deploy a new key, and either let old data slowly get phased out, or run a nightly load+save batch job to do
-key migration. Once all old keys are phased out, you may remove the old key from the configuration.
+`spring-data-mongodb-encrypt` would automatically use the highest versioned key for encryption by default, but supports decryption using any of the keys. This allows you to deploy a new key, and either let old data slowly get phased out, or run a nightly load+save batch job to force key migration. Once all old keys are phased out, you may remove the old key from the configuration.
+
+You can use
+
+```yaml
+mongodb.encrypt:
+  default-key: 1
+```
+
+to override which version of the defined keys is considered 'default'.
 
 
 ## Encrypt other data
