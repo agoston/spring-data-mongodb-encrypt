@@ -5,7 +5,6 @@ import com.bol.crypt.DocumentCryptException;
 import com.bol.crypt.FieldCryptException;
 import com.bol.reflection.Node;
 import org.bson.Document;
-import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.mapping.BasicMongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
@@ -49,7 +48,7 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         try {
             cryptFields(document, node, new Decoder());
         } catch (Exception e) {
-            ObjectId id = document.getObjectId("_id");
+            Object id = document.get("_id");
             throw new DocumentCryptException(event.getCollectionName(), id, e);
         }
     }
@@ -64,7 +63,7 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         try {
             cryptFields(document, node, new Encoder());
         } catch (Exception e) {
-            ObjectId id = document.getObjectId("_id");
+            Object id = document.get("_id");
             throw new DocumentCryptException(event.getCollectionName(), id, e);
         }
     }
