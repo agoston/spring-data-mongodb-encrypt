@@ -30,7 +30,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>2.4.2</version>
+            <version>2.4.3</version>
         </dependency>
 ```
 
