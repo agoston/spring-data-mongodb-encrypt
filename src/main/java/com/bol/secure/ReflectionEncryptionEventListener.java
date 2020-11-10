@@ -18,6 +18,7 @@ import java.util.function.Function;
 
 import static com.bol.reflection.Node.Type.*;
 
+// FIXME: check if we could bring CachedEncryptionEventListener and ReflectionEncryptionEventListener closer together; they are after all doing the same thing, just one at startup, one runtime
 /**
  * This is a reimplementation of {@link CachedEncryptionEventListener}, to support polymorphism.
  * This means that while instead of walking by pre-cached class reflection, we have to walk by the Document provided and
@@ -76,6 +77,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         } else throw new IllegalArgumentException("Unknown reflective type class " + type);
 
         if (value instanceof Document) {
+            // Document could be a Map OR a Document; decide based on reflectiveClass
             if (Map.class.isAssignableFrom(reflectiveClass)) {
                 Type subFieldType = typeArguments[1];
 

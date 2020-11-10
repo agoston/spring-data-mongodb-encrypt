@@ -71,6 +71,7 @@ public class ReflectionCache {
     }
 
     // used by ReflectionEncryptionEventListener to map a single Document
+    // FIXME: this is a slimmed down copy-paste of reflectRecursive(); find a way to bring Cached and Reflective listener closer together!
     public List<Node> reflectSingle(Class objectClass) {
         List<Node> result = reflectionCache.get(objectClass);
         if (result != null) {
