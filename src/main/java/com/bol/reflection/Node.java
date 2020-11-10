@@ -45,5 +45,16 @@ public class Node {
         DOCUMENT
     }
 
+    @Override
+    public String toString() {
+        return "Node{" +
+                "fieldName='" + fieldName + '\'' +
+                ", documentName='" + documentName + '\'' +
+                ", children=" + children +
+                ", type=" + type +
+                ", field=" + field +
+                '}';
+    }
+
     public static final Node EMPTY = new Node(null, null, null);
 }

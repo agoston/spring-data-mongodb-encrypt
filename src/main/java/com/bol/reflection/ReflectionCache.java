@@ -19,12 +19,15 @@ public class ReflectionCache {
     private Map<Class, List<Node>> reflectionCache = new ConcurrentHashMap<>();
 
     // used by CachedEncryptionEventListener to gather metadata of a class and all it fields, recursively.
-    public List<Node> reflectRecursive(Class objectClass) {
+    public List<Node> reflect(Class objectClass) {
         List<Node> result = reflectionCache.get(objectClass);
         if (result != null) {
             LOG.trace("cyclic reference found; {} is already mapped", objectClass.getName());
             return result;
         }
+
+        // java primitive type; ignore
+        if (objectClass.getPackage().getName().equals("java.lang")) return Collections.emptyList();
 
         List<Node> nodes = new ArrayList<>();
         reflectionCache.put(objectClass, nodes);
@@ -54,50 +57,8 @@ public class ReflectionCache {
 
                     } else {
                         // descending into sub-documents
-                        List<Node> children = reflectRecursive(fieldType);
+                        List<Node> children = reflect(fieldType);
                         if (!children.isEmpty()) nodes.add(new Node(fieldName, documentName, children, Node.Type.DOCUMENT, field));
-                    }
-                }
-
-            } catch (Exception e) {
-                throw new IllegalArgumentException(objectClass.getName() + "." + fieldName, e);
-            }
-        });
-
-        return nodes;
-    }
-
-    // Used by ReflectionEncryptionEventListener to gather metadata from a single class.
-    public List<Node> reflectSingle(Class objectClass) {
-        List<Node> result = reflectionCache.get(objectClass);
-        if (result != null) {
-            LOG.trace("cyclic reference found; {} is already mapped", objectClass.getName());
-            return result;
-        }
-
-        List<Node> nodes = new ArrayList<>();
-        reflectionCache.put(objectClass, nodes);
-
-        ReflectionUtils.doWithFields(objectClass, field -> {
-            String fieldName = field.getName();
-            try {
-                if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) return;
-
-                String documentName = parseFieldAnnotation(field, fieldName);
-
-                if (field.isAnnotationPresent(Encrypted.class)) {
-                    // direct @Encrypted annotation - crypt the corresponding field of BasicDbObject
-                    nodes.add(new Node(fieldName, documentName, Collections.emptyList(), Node.Type.DIRECT, field));
-
-                } else {
-                    Class<?> fieldType = field.getType();
-
-                    if (Collection.class.isAssignableFrom(fieldType)) {
-                        nodes.add(new Node(fieldName, documentName, Collections.emptyList(), Node.Type.LIST, field));
-                    } else if (Map.class.isAssignableFrom(fieldType)) {
-                        nodes.add(new Node(fieldName, documentName, Collections.emptyList(), Node.Type.MAP, field));
-                    } else {
-                        nodes.add(new Node(fieldName, documentName, Collections.emptyList(), Node.Type.DOCUMENT, field));
                     }
                 }
 
@@ -111,7 +72,7 @@ public class ReflectionCache {
 
     List<Node> processParameterizedTypes(Type type) {
         if (type instanceof Class) {
-            List<Node> children = reflectRecursive((Class) type);
+            List<Node> children = reflect((Class) type);
             if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.DOCUMENT));
 
         } else if (type instanceof ParameterizedType) {
@@ -126,9 +87,14 @@ public class ReflectionCache {
                 List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[1]);
                 if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.MAP));
 
-            } else throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass());
+            } else {
+                throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass());
+            }
 
-        } else throw new IllegalArgumentException("Unknown reflective type class " + type.getClass());
+        } else {
+            throw new IllegalArgumentException("Unknown reflective type class " + type.getClass());
+        }
+
         return Collections.emptyList();
     }
 

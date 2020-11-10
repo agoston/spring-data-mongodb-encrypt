@@ -25,7 +25,7 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
     }
 
     Node node(Class clazz) {
-        List<Node> children = reflectionCache.reflectRecursive(clazz);
+        List<Node> children = reflectionCache.reflect(clazz);
         if (!children.isEmpty()) return new Node("", children, Node.Type.DOCUMENT);
         return Node.EMPTY;
     }

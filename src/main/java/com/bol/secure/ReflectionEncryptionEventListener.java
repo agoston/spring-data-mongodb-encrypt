@@ -31,7 +31,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
     ReflectionCache reflectionCache = new ReflectionCache();
 
     void cryptDocument(Document document, Class clazz, Function<Object, Object> crypt) {
-        List<Node> nodes = reflectionCache.reflectSingle(clazz);
+        List<Node> nodes = reflectionCache.reflect(clazz);
 
         for (Map.Entry<String, Object> field : document.entrySet()) {
             String documentName = field.getKey();
@@ -52,35 +52,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
             } else {
 
                 try {
-                    if (node.type == LIST) {
-                        ParameterizedType parameterizedType = (ParameterizedType) node.field.getGenericType();
-                        Type subFieldType = parameterizedType.getActualTypeArguments()[0];
-                        List list = (List) fieldValue;
-                        for (int i = 0; i < list.size(); i++) {
-                            try {
-                                diveInto(crypt, list.get(i), subFieldType);
-                            } catch (FieldCryptException e) {
-                                throw e.chain(Integer.toString(i));
-                            }
-                        }
-
-                    } else if (node.type == MAP) {
-                        ParameterizedType parameterizedType = (ParameterizedType) node.field.getGenericType();
-                        Type subFieldType = parameterizedType.getActualTypeArguments()[1];
-                        Document map = (Document) fieldValue;
-                        for (Map.Entry<String, Object> entry : map.entrySet()) {
-                            try {
-                                diveInto(crypt, entry.getValue(), subFieldType);
-                            } catch (FieldCryptException e) {
-                                throw e.chain(entry.getKey());
-                            }
-                        }
-
-                    } else if (fieldValue instanceof Document) {
-                        // descending into sub-documents
-                        Document subObject = (Document) fieldValue;
-                        diveInto(crypt, subObject, node.field.getType());
-                    }
+                    diveInto(fieldValue, node.field.getGenericType(), crypt);
                 } catch (FieldCryptException e) {
                     throw e.chain(documentName);
                 }
@@ -88,62 +60,60 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         }
     }
 
-    void diveInto(Function<Object, Object> crypt, Object value, Type fieldType) {
-        if (value instanceof Document) {
-            Class<?> childNode = fetchClassFromField((Document) value);
-            if (childNode != null) {
-                cryptDocument((Document) value, childNode, crypt);
-                return;
-            }
+    void diveInto(Object value, Type type, Function<Object, Object> crypt) {
+        // primitive type, nothing to do here
+        if (value.getClass().getPackage().getName().equals("java.lang")) return;
 
-            // fall back to reflection
-            if (fieldType instanceof Class) {
-                childNode = (Class) fieldType;
-                cryptDocument((Document) value, childNode, crypt);
+        Class reflectiveClass = null;
+        Type[] typeArguments = null;
+        if (type instanceof Class) reflectiveClass = (Class) type;
+        else if (type instanceof ParameterizedType) {
+            ParameterizedType parameterizedType = (ParameterizedType) type;
+            Type rawType = parameterizedType.getRawType();
+            typeArguments = parameterizedType.getActualTypeArguments();
+            if (!(rawType instanceof Class)) throw new IllegalArgumentException("Unknown reflective type class " + type);
+            reflectiveClass = (Class) rawType;
+        } else throw new IllegalArgumentException("Unknown reflective type class " + type);
+
+        if (value instanceof Document) {
+            if (Map.class.isAssignableFrom(reflectiveClass)) {
+                Type subFieldType = typeArguments[1];
+
+                for (Map.Entry entry : ((Map<?, ?>) value).entrySet()) {
+                    try {
+                        diveInto(entry.getValue(), subFieldType, crypt);
+                    } catch (FieldCryptException e) {
+                        throw e.chain(entry.getKey().toString());
+                    }
+                }
+
             } else {
-                throw new IllegalArgumentException("Unknown reflective type class " + fieldType);
+                Class<?> childNode = fetchClassFromField((Document) value);
+                if (childNode != null) {
+                    cryptDocument((Document) value, childNode, crypt);
+                } else {
+                    cryptDocument((Document) value, reflectiveClass, crypt);
+                }
             }
         } else if (value instanceof List) {
-            if (fieldType instanceof ParameterizedType) {
-                ParameterizedType subType = (ParameterizedType) fieldType;
-                Class rawType = (Class) subType.getRawType();
+            if (Collection.class.isAssignableFrom(reflectiveClass)) {
+                Type subFieldType = typeArguments[0];
+                List list = (List) value;
 
-                if (Collection.class.isAssignableFrom(rawType)) {
-                    Type subFieldType = subType.getActualTypeArguments()[0];
-
-                    for (Object o : (List) value)
-                        diveInto(crypt, o, subFieldType);
-
-                } else {
-                    throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass() + "; should be Map<> or Collection<>");
+                for (int i = 0; i < list.size(); i++) {
+                    try {
+                        diveInto(list.get(i), subFieldType, crypt);
+                    } catch (FieldCryptException e) {
+                        throw e.chain(Integer.toString(i));
+                    }
                 }
+
             } else {
-                throw new IllegalArgumentException("Unknown reflective type class " + fieldType.getClass());
+                throw new IllegalArgumentException("Unknown reflective type class " + type.getClass());
             }
-        } else if (value instanceof Map) {
-            if (fieldType instanceof ParameterizedType) {
-                ParameterizedType subType = (ParameterizedType) fieldType;
-                Class rawType = (Class) subType.getRawType();
-
-                if (Map.class.isAssignableFrom(rawType)) {
-                    Type subFieldType = subType.getActualTypeArguments()[0];
-
-                    for (Object o : (List) value)
-                        diveInto(crypt, o, subFieldType);
-
-                } else {
-                    throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass() + "; should be Map<> or Collection<>");
-                }
-            } else {
-                throw new IllegalArgumentException("Unknown reflective type class " + fieldType.getClass());
-            }
-
-
-        } else if (value.getClass().getPackage().getName().equals("java.lang"))
-            // primitive type, nothing to do here
-            return;
-        else
+        } else {
             throw new IllegalArgumentException("Unknown reflective value class: " + value.getClass());
+        }
     }
 
     private static Class<?> fetchClassFromField(Document value) {
