@@ -31,7 +31,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
     ReflectionCache reflectionCache = new ReflectionCache();
 
     void cryptDocument(Document document, Class clazz, Function<Object, Object> crypt) {
-        List<Node> nodes = reflectionCache.reflect(clazz);
+        List<Node> nodes = reflectionCache.reflectSingle(clazz);
 
         for (Map.Entry<String, Object> field : document.entrySet()) {
             String documentName = field.getKey();
