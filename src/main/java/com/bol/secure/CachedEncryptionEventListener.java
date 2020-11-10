@@ -4,38 +4,30 @@ import com.bol.crypt.CryptVault;
 import com.bol.crypt.DocumentCryptException;
 import com.bol.crypt.FieldCryptException;
 import com.bol.reflection.Node;
+import com.bol.reflection.ReflectionCache;
 import org.bson.Document;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.mapping.BasicMongoPersistentEntity;
-import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeSaveEvent;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-import static com.bol.reflection.ReflectionCache.processDocument;
-
+/**
+ * Does all reflection at startup. There is no reflection used at runtime.
+ * Does not support polymorphism and does not need '_class' fields either.
+ */
 public class CachedEncryptionEventListener extends AbstractEncryptionEventListener<CachedEncryptionEventListener> {
-    @Autowired MongoMappingContext mappingContext;
-
-    Map<Class, Node> encrypted = new ConcurrentHashMap<>();
+    ReflectionCache reflectionCache = new ReflectionCache();
 
     public CachedEncryptionEventListener(CryptVault cryptVault) {
         super(cryptVault);
     }
 
     Node node(Class clazz) {
-        return encrypted.computeIfAbsent(clazz, c -> {
-            BasicMongoPersistentEntity<?> entity = mappingContext.getPersistentEntity(c);
-            if (entity == null) return Node.EMPTY;
-
-            List<Node> children = processDocument(entity.getType());
-            if (!children.isEmpty()) return new Node("", children, Node.Type.ROOT);
-            return Node.EMPTY;
-        });
+        List<Node> children = reflectionCache.reflectRecursive(clazz);
+        if (!children.isEmpty()) return new Node("", children, Node.Type.DOCUMENT);
+        return Node.EMPTY;
     }
 
     @Override
@@ -76,7 +68,6 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
                     break;
 
                 case DOCUMENT:
-                case ROOT:
                     cryptDocument((Document) o, node, crypt);
                     break;
 
@@ -118,12 +109,12 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
 
     void cryptDocument(Document document, Node node, Function<Object, Object> crypt) {
         for (Node childNode : node.children) {
-            Object value = document.get(childNode.fieldName);
+            Object value = document.get(childNode.documentName);
             if (value == null) continue;
 
             if (childNode.type == Node.Type.DIRECT) {
                 try {
-                    document.put(childNode.fieldName, crypt.apply(value));
+                    document.put(childNode.documentName, crypt.apply(value));
                 } catch (Exception e) {
                     throw new FieldCryptException(childNode.fieldName, e);
                 }

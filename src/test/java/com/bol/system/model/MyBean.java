@@ -1,4 +1,4 @@
-package com.bol.system;
+package com.bol.system.model;
 
 import com.bol.secure.Encrypted;
 import org.springframework.data.annotation.Id;
@@ -82,6 +82,8 @@ public class MyBean {
 
     @Field
     public Map<String, List<MySubBean>> nestedListMap;
+
+    public Map<String, Map<String, MySubBean>> nestedMapMap;
 
     @Field
     @Encrypted

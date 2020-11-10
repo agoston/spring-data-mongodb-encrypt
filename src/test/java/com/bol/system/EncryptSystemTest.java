@@ -2,8 +2,7 @@ package com.bol.system;
 
 import com.bol.crypt.*;
 import com.bol.secure.AbstractEncryptionEventListener;
-import com.bol.system.model.Person;
-import com.bol.system.model.Ssn;
+import com.bol.system.model.*;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import org.bson.Document;
@@ -13,14 +12,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.*;
 
 import static com.bol.crypt.CryptVault.fromSignedByte;
-import static com.bol.system.MyBean.MONGO_NONSENSITIVEDATA;
-import static com.bol.system.MyBean.MONGO_SECRETSTRING;
+import static com.bol.system.model.MyBean.MONGO_NONSENSITIVEDATA;
+import static com.bol.system.model.MyBean.MONGO_SECRETSTRING;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
@@ -36,6 +36,8 @@ public abstract class EncryptSystemTest {
     @Before
     public void cleanDb() {
         mongoTemplate.dropCollection(MyBean.class);
+        mongoTemplate.dropCollection(Person.class);
+        mongoTemplate.dropCollection(RenamedField.class);
     }
 
     @Test
@@ -65,6 +67,25 @@ public abstract class EncryptSystemTest {
         // 12 is a magic constant that seems to be the overhead when serializing list of strings to BSON with mongo driver 3.4.2
         int expectedLength = 12 + bean.secretStringList.stream().mapToInt(s -> s.length() + 8).sum();
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), expectedLength);
+    }
+
+    @Test
+    public void testCustomFieldnameWorks() {
+        RenamedField bean = new RenamedField();
+        bean.notSecret = "not secret";
+        bean.someSecret = "whacky pass";
+
+        mongoTemplate.save(bean);
+
+        RenamedField fromDb = mongoTemplate.findOne(new Query(), RenamedField.class);
+
+        assertThat(fromDb.notSecret, is(bean.notSecret));
+        assertThat(fromDb.someSecret, is(bean.someSecret));
+
+        Document fromMongo = mongoTemplate.getCollection(RenamedField.MONGO_RENAMEDFIELD).find().first();
+        assertThat(fromMongo.get(RenamedField.MONGO_NOTSECRET), is(bean.notSecret));
+        assertThat(fromMongo.get(RenamedField.MONGO_SOMESECRET), is(nullValue()));
+        assertThat(fromMongo.get(RenamedField.MONGO_PASSWORD), is(instanceOf(Binary.class)));
     }
 
     @Test
@@ -339,6 +360,33 @@ public abstract class EncryptSystemTest {
         Document dbNestedListMap = (Document) fromMongo.get("nestedListMap");
         ArrayList dbNestedList = (ArrayList) dbNestedListMap.get("one");
         Document dbBean = (Document) dbNestedList.get(1);
+        Object encryptedField = dbBean.get("secretString");
+        assertThat(encryptedField, is(instanceOf(Binary.class)));
+        Object encryptedFieldData = ((Binary) encryptedField).getData();
+        assertThat(encryptedFieldData, is(instanceOf(byte[].class)));
+    }
+
+    @Test
+    public void testNestedMapMap() {
+        MyBean bean = new MyBean();
+        Map<String, MySubBean> innerMap = new HashMap<>();
+        innerMap.put("one", new MySubBean("one1", "one2"));
+        innerMap.put("two", new MySubBean("two1", "two2"));
+
+        Map<String, Map<String, MySubBean>> outerMap = new HashMap<>();
+        outerMap.put("inner", innerMap);
+        bean.nestedMapMap = outerMap;
+
+        mongoTemplate.save(bean);
+
+        MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
+
+        assertThat(fromDb.nestedMapMap.get("inner").get("two").secretString, is("two2"));
+
+        Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
+        Document dbNestedMapMap = (Document) fromMongo.get("nestedMapMap");
+        Document dbNestedMapInner = (Document) dbNestedMapMap.get("inner");
+        Document dbBean = (Document) dbNestedMapInner.get("one");
         Object encryptedField = dbBean.get("secretString");
         assertThat(encryptedField, is(instanceOf(Binary.class)));
         Object encryptedFieldData = ((Binary) encryptedField).getData();

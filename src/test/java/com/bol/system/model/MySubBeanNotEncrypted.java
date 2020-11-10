@@ -1,4 +1,4 @@
-package com.bol.system;
+package com.bol.system.model;
 
 import org.springframework.data.mongodb.core.mapping.Field;
 
