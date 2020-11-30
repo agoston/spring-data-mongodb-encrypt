@@ -27,7 +27,7 @@ public class ReflectionCache {
         }
 
         // java primitive type; ignore
-        if (objectClass.getPackage().getName().equals("java.lang")) return Collections.emptyList();
+        if (ClassUtils.isPrimitiveOrWrapper(objectClass)) return Collections.emptyList();
 
         List<Node> nodes = new ArrayList<>();
         reflectionCache.put(objectClass, nodes);
