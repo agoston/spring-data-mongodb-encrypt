@@ -4,7 +4,7 @@
 
 # spring-data-mongodb-encrypt
 
-Allows any @Field to be marked with @Encrypted for per-field encryption.
+Allows any field to be marked with `@Encrypted` for per-field encryption.
 
 ## Features
 
