@@ -21,8 +21,7 @@ import java.util.*;
 import static com.bol.crypt.CryptVault.fromSignedByte;
 import static com.bol.system.model.MyBean.MONGO_NONSENSITIVEDATA;
 import static com.bol.system.model.MyBean.MONGO_SECRETSTRING;
-import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
@@ -41,7 +40,7 @@ public abstract class EncryptSystemTest {
     }
 
     @Test
-    public void checkEncryptPrimitives() {
+    public void simpleEncryption() {
         MyBean bean = new MyBean();
         bean.nonSensitiveData = "grass is green";
         bean.secretString = "earth is flat     ";
@@ -53,20 +52,35 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nonSensitiveData, is(bean.nonSensitiveData));
-        assertThat(fromDb.secretString, is(bean.secretString));
-        assertThat(fromDb.secretLong, is(bean.secretLong));
-        assertThat(fromDb.secretBoolean, is(bean.secretBoolean));
-        assertThat(fromDb.secretStringList, is(bean.secretStringList));
+        assertThat(fromDb.nonSensitiveData).isEqualTo(bean.nonSensitiveData);
+        assertThat(fromDb.secretString).isEqualTo(bean.secretString);
+        assertThat(fromDb.secretLong).isEqualTo(bean.secretLong);
+        assertThat(fromDb.secretBoolean).isEqualTo(bean.secretBoolean);
+        assertThat(fromDb.secretStringList).isEqualTo(bean.secretStringList);
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
-        assertThat(fromMongo.get(MyBean.MONGO_NONSENSITIVEDATA), is(bean.nonSensitiveData));
+        assertThat(fromMongo.get(MyBean.MONGO_NONSENSITIVEDATA)).isEqualTo(bean.nonSensitiveData);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length() + 12);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
         // 12 is a magic constant that seems to be the overhead when serializing list of strings to BSON with mongo driver 3.4.2
         int expectedLength = 12 + bean.secretStringList.stream().mapToInt(s -> s.length() + 8).sum();
         assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), expectedLength);
+    }
+
+    @Test
+    public void checkEncryptPrimitives() {
+        PrimitiveField bean = new PrimitiveField();
+        bean.primitiveInt = 1;
+        bean.encryptedPrimitiveInt = 2;
+        mongoTemplate.save(bean);
+
+        PrimitiveField fromDb = mongoTemplate.findOne(new Query(), PrimitiveField.class);
+
+        assertThat(fromDb.primitiveInt).isEqualTo(bean.primitiveInt);
+        assertThat(fromDb.encryptedPrimitiveInt).isEqualTo(bean.encryptedPrimitiveInt);
+
+        // FIXME: test for DB encoding of java primitives
     }
 
     @Test
@@ -79,13 +93,13 @@ public abstract class EncryptSystemTest {
 
         RenamedField fromDb = mongoTemplate.findOne(new Query(), RenamedField.class);
 
-        assertThat(fromDb.notSecret, is(bean.notSecret));
-        assertThat(fromDb.someSecret, is(bean.someSecret));
+        assertThat(fromDb.notSecret).isEqualTo(bean.notSecret);
+        assertThat(fromDb.someSecret).isEqualTo(bean.someSecret);
 
         Document fromMongo = mongoTemplate.getCollection(RenamedField.MONGO_RENAMEDFIELD).find().first();
-        assertThat(fromMongo.get(RenamedField.MONGO_NOTSECRET), is(bean.notSecret));
-        assertThat(fromMongo.get(RenamedField.MONGO_SOMESECRET), is(nullValue()));
-        assertThat(fromMongo.get(RenamedField.MONGO_PASSWORD), is(instanceOf(Binary.class)));
+        assertThat(fromMongo.get(RenamedField.MONGO_NOTSECRET)).isEqualTo(bean.notSecret);
+        assertThat(fromMongo.get(RenamedField.MONGO_SOMESECRET)).isNull();
+        assertThat(fromMongo.get(RenamedField.MONGO_PASSWORD)).isInstanceOf(Binary.class);
     }
 
     @Test
@@ -97,8 +111,8 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.secretSubBean.nonSensitiveData, is(bean.secretSubBean.nonSensitiveData));
-        assertThat(fromDb.secretSubBean.secretString, is(bean.secretSubBean.secretString));
+        assertThat(fromDb.secretSubBean.nonSensitiveData).isEqualTo(bean.secretSubBean.nonSensitiveData);
+        assertThat(fromDb.secretSubBean.secretString).isEqualTo(bean.secretSubBean.secretString);
 
         Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         DBObject fromMongo = new BasicDBObject(doc);
@@ -119,14 +133,13 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nonSensitiveSubBean.nonSensitiveData, is(bean.nonSensitiveSubBean.nonSensitiveData));
-        assertThat(fromDb.nonSensitiveSubBean.secretString, is(bean.nonSensitiveSubBean.secretString));
+        assertThat(fromDb.nonSensitiveSubBean.nonSensitiveData).isEqualTo(bean.nonSensitiveSubBean.nonSensitiveData);
+        assertThat(fromDb.nonSensitiveSubBean.secretString).isEqualTo(bean.nonSensitiveSubBean.secretString);
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         Document subMongo = (Document) fromMongo.get(MyBean.MONGO_NONSENSITIVESUBBEAN);
 
-
-        assertThat(subMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(subBean.nonSensitiveData));
+        assertThat(subMongo.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(subBean.nonSensitiveData);
         assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
     }
 
@@ -144,8 +157,8 @@ public abstract class EncryptSystemTest {
         for (int i = 0; i < bean.nonSensitiveSubBeanList.size(); i++) {
             MySubBean subBean = bean.nonSensitiveSubBeanList.get(i);
             MySubBean subDb = fromDb.nonSensitiveSubBeanList.get(i);
-            assertThat(subBean.secretString, is(subDb.secretString));
-            assertThat(subBean.nonSensitiveData, is(subDb.nonSensitiveData));
+            assertThat(subBean.secretString).isEqualTo(subDb.secretString);
+            assertThat(subBean.nonSensitiveData).isEqualTo(subDb.nonSensitiveData);
         }
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
@@ -154,7 +167,7 @@ public abstract class EncryptSystemTest {
         for (int i = 0; i < bean.nonSensitiveSubBeanList.size(); i++) {
             Document basicDBObject = (Document) subMongo.get(i);
             MySubBean subBean = bean.nonSensitiveSubBeanList.get(i);
-            assertThat(basicDBObject.get(MySubBean.MONGO_NONSENSITIVEDATA), is(subBean.nonSensitiveData));
+            assertThat(basicDBObject.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(subBean.nonSensitiveData);
             assertCryptLength(basicDBObject.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
         }
     }
@@ -170,10 +183,10 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nonSensitiveMap.get("one").secretString, is(bean.nonSensitiveMap.get("one").secretString));
-        assertThat(fromDb.nonSensitiveMap.get("one").nonSensitiveData, is(bean.nonSensitiveMap.get("one").nonSensitiveData));
-        assertThat(fromDb.nonSensitiveMap.get("two").secretString, is(bean.nonSensitiveMap.get("two").secretString));
-        assertThat(fromDb.nonSensitiveMap.get("two").nonSensitiveData, is(bean.nonSensitiveMap.get("two").nonSensitiveData));
+        assertThat(fromDb.nonSensitiveMap.get("one").secretString).isEqualTo(bean.nonSensitiveMap.get("one").secretString);
+        assertThat(fromDb.nonSensitiveMap.get("one").nonSensitiveData).isEqualTo(bean.nonSensitiveMap.get("one").nonSensitiveData);
+        assertThat(fromDb.nonSensitiveMap.get("two").secretString).isEqualTo(bean.nonSensitiveMap.get("two").secretString);
+        assertThat(fromDb.nonSensitiveMap.get("two").nonSensitiveData).isEqualTo(bean.nonSensitiveMap.get("two").nonSensitiveData);
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
 
@@ -182,8 +195,8 @@ public abstract class EncryptSystemTest {
         Document twoMongo = (Document) mapMongo.get("two");
 
 
-        assertThat(oneMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(map.get("one").nonSensitiveData));
-        assertThat(twoMongo.get(MySubBean.MONGO_NONSENSITIVEDATA), is(map.get("two").nonSensitiveData));
+        assertThat(oneMongo.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(map.get("one").nonSensitiveData);
+        assertThat(twoMongo.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(map.get("two").nonSensitiveData);
         assertCryptLength(oneMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("one").secretString.length() + 12);
         assertCryptLength(twoMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("two").secretString.length() + 12);
     }
@@ -199,10 +212,10 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.secretMap.get("one").secretString, is(bean.secretMap.get("one").secretString));
-        assertThat(fromDb.secretMap.get("one").nonSensitiveData, is(bean.secretMap.get("one").nonSensitiveData));
-        assertThat(fromDb.secretMap.get("two").secretString, is(bean.secretMap.get("two").secretString));
-        assertThat(fromDb.secretMap.get("two").nonSensitiveData, is(bean.secretMap.get("two").nonSensitiveData));
+        assertThat(fromDb.secretMap.get("one").secretString).isEqualTo(bean.secretMap.get("one").secretString);
+        assertThat(fromDb.secretMap.get("one").nonSensitiveData).isEqualTo(bean.secretMap.get("one").nonSensitiveData);
+        assertThat(fromDb.secretMap.get("two").secretString).isEqualTo(bean.secretMap.get("two").secretString);
+        assertThat(fromDb.secretMap.get("two").nonSensitiveData).isEqualTo(bean.secretMap.get("two").nonSensitiveData);
 
         Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         DBObject fromMongo = new BasicDBObject(doc);
@@ -228,9 +241,9 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.secretSetPrimitive.contains("one"), is(true));
-        assertThat(fromDb.secretSetPrimitive.contains("two"), is(true));
-        assertThat(fromDb.secretSetPrimitive.size(), is(2));
+        assertThat(fromDb.secretSetPrimitive.contains("one")).isEqualTo(true);
+        assertThat(fromDb.secretSetPrimitive.contains("two")).isEqualTo(true);
+        assertThat(fromDb.secretSetPrimitive.size()).isEqualTo(2);
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         int expectedLength = 12
@@ -251,9 +264,9 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.secretSetSubDocument.size(), is(2));
-        assertTrue(fromDb.secretSetSubDocument.stream().anyMatch(s -> Objects.equals(s.nonSensitiveData, "sky is blue")));
-        assertTrue(fromDb.secretSetSubDocument.stream().anyMatch(s -> Objects.equals(s.nonSensitiveData, "grass is green")));
+        assertThat(fromDb.secretSetSubDocument.size()).isEqualTo(2);
+        assertThat(fromDb.secretSetSubDocument.stream().anyMatch(s -> Objects.equals(s.nonSensitiveData, "sky is blue"))).isTrue();
+        assertThat(fromDb.secretSetSubDocument.stream().anyMatch(s -> Objects.equals(s.nonSensitiveData, "grass is green"))).isTrue();
 
         Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         DBObject fromMongo = new BasicDBObject(doc);
@@ -281,15 +294,15 @@ public abstract class EncryptSystemTest {
      * (e.g. for a single primitive string, 12 extra bytes are added above its own length)
      */
     public void assertCryptLength(Object cryptedSecretBinary, int serializedLength) {
-        assertThat(cryptedSecretBinary, is(instanceOf(Binary.class)));
+        assertThat(cryptedSecretBinary).isInstanceOf(Binary.class);
 
         Object cryptedSecretBytes = ((Binary) cryptedSecretBinary).getData();
 
-        assertThat(cryptedSecretBytes, is(instanceOf(byte[].class)));
+        assertThat(cryptedSecretBytes).isInstanceOf(byte[].class);
         byte[] cryptedBytes = (byte[]) cryptedSecretBytes;
 
         int expectedCryptedLength = cryptVault.expectedCryptedLength(serializedLength);
-        assertThat(cryptedBytes.length, is(expectedCryptedLength));
+        assertThat(cryptedBytes.length).isEqualTo(expectedCryptedLength);
     }
 
     @Test
@@ -309,9 +322,9 @@ public abstract class EncryptSystemTest {
         Binary cryptedSecretBinary2 = (Binary) fromMongo2.get(MyBean.MONGO_SECRETSTRING);
         byte[] cryptedSecret2 = cryptedSecretBinary2.getData();
 
-        assertThat(cryptedSecret1.length, is(cryptedSecret2.length));
+        assertThat(cryptedSecret1.length).isEqualTo(cryptedSecret2.length);
         // version
-        assertThat(cryptedSecret1[0], is(cryptedSecret2[0]));
+        assertThat(cryptedSecret1[0]).isEqualTo(cryptedSecret2[0]);
 
         // chances of having the same bytes in the same positions is negligible
         int equals = 0;
@@ -319,7 +332,7 @@ public abstract class EncryptSystemTest {
             if (cryptedSecret1[i] == cryptedSecret2[i]) equals++;
         }
 
-        assertThat("crypted fields look too much alike", equals, is(not(greaterThan(cryptedSecret1.length / 10))));
+        assertThat(equals).isLessThan(cryptedSecret1.length / 10).as("crypted fields look too much alike");
     }
 
     @Test
@@ -333,14 +346,14 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.encryptedNestedListMap.get("one").get(1).secretString, is("one4"));
+        assertThat(fromDb.encryptedNestedListMap.get("one").get(1).secretString).isEqualTo("one4");
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
 
         Object binarySecret = fromMongo.get("encryptedNestedListMap");
-        assertThat(binarySecret, is(instanceOf(Binary.class)));
+        assertThat(binarySecret).isInstanceOf(Binary.class);
 
-        assertThat(((Binary) binarySecret).getData(), is(instanceOf(byte[].class)));
+        assertThat(((Binary) binarySecret).getData()).isInstanceOf(byte[].class);
     }
 
     @Test
@@ -354,16 +367,16 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nestedListMap.get("one").get(1).secretString, is("one4"));
+        assertThat(fromDb.nestedListMap.get("one").get(1).secretString).isEqualTo("one4");
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         Document dbNestedListMap = (Document) fromMongo.get("nestedListMap");
         ArrayList dbNestedList = (ArrayList) dbNestedListMap.get("one");
         Document dbBean = (Document) dbNestedList.get(1);
         Object encryptedField = dbBean.get("secretString");
-        assertThat(encryptedField, is(instanceOf(Binary.class)));
+        assertThat(encryptedField).isInstanceOf(Binary.class);
         Object encryptedFieldData = ((Binary) encryptedField).getData();
-        assertThat(encryptedFieldData, is(instanceOf(byte[].class)));
+        assertThat(encryptedFieldData).isInstanceOf(byte[].class);
     }
 
     @Test
@@ -381,16 +394,16 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nestedMapMap.get("inner").get("two").secretString, is("two2"));
+        assertThat(fromDb.nestedMapMap.get("inner").get("two").secretString).isEqualTo("two2");
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new BasicDBObject("_id", new ObjectId(bean.id))).first();
         Document dbNestedMapMap = (Document) fromMongo.get("nestedMapMap");
         Document dbNestedMapInner = (Document) dbNestedMapMap.get("inner");
         Document dbBean = (Document) dbNestedMapInner.get("one");
         Object encryptedField = dbBean.get("secretString");
-        assertThat(encryptedField, is(instanceOf(Binary.class)));
+        assertThat(encryptedField).isInstanceOf(Binary.class);
         Object encryptedFieldData = ((Binary) encryptedField).getData();
-        assertThat(encryptedFieldData, is(instanceOf(byte[].class)));
+        assertThat(encryptedFieldData).isInstanceOf(byte[].class);
     }
 
     @Test
@@ -404,15 +417,15 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nestedListList.get(0).get(1).secretString, is("one4"));
-        assertThat(fromDb.nestedListList.get(0).get(1).nonSensitiveData, is("one3"));
+        assertThat(fromDb.nestedListList.get(0).get(1).secretString).isEqualTo("one4");
+        assertThat(fromDb.nestedListList.get(0).get(1).nonSensitiveData).isEqualTo("one3");
 
         Document doc = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
         ArrayList nestedListList = (ArrayList) doc.get("nestedListList");
         ArrayList nestedList = (ArrayList) nestedListList.get(1);
         Document dbDoc = (Document) nestedList.get(0);
         Object encryptedField = dbDoc.get("secretString");
-        assertThat(encryptedField, is(instanceOf(Binary.class)));
+        assertThat(encryptedField).isInstanceOf(Binary.class);
     }
 
     @Test
@@ -426,7 +439,7 @@ public abstract class EncryptSystemTest {
 
         MyBean fromDb = mongoTemplate.findOne(query(where("_id").is(bean.id)), MyBean.class);
 
-        assertThat(fromDb.nestedListListNotEncrypted.get(0).get(1).nonSensitiveData1, is("one3"));
+        assertThat(fromDb.nestedListListNotEncrypted.get(0).get(1).nonSensitiveData1).isEqualTo("one3");
     }
 
     @Test
@@ -440,22 +453,22 @@ public abstract class EncryptSystemTest {
         mongoTemplate.save(person);
 
         Person fromDb = mongoTemplate.findOne(query(where("_id").is(person.id)), Person.class);
-        assertThat(fromDb.ssn.notSecret, is(person.ssn.notSecret));
-        assertThat(fromDb.ssn.someSecret, is(person.ssn.someSecret));
-        assertThat(fromDb.ssn.ssn, is(person.ssn.ssn));
+        assertThat(fromDb.ssn.notSecret).isEqualTo(person.ssn.notSecret);
+        assertThat(fromDb.ssn.someSecret).isEqualTo(person.ssn.someSecret);
+        assertThat(fromDb.ssn.ssn).isEqualTo(person.ssn.ssn);
 
         Document fromMongo = mongoTemplate.getCollection(Person.MONGO_PERSON).find(new Document("_id", new ObjectId(person.id))).first();
         Document dbBean = (Document) fromMongo.get("ssn");
         Object encryptedField = dbBean.get("ssn");
-        assertThat(encryptedField, is(instanceOf(Binary.class)));
+        assertThat(encryptedField).isInstanceOf(Binary.class);
         Object encryptedFieldData = ((Binary) encryptedField).getData();
-        assertThat(encryptedFieldData, is(instanceOf(byte[].class)));
+        assertThat(encryptedFieldData).isInstanceOf(byte[].class);
         Object encryptedInheritedField = dbBean.get("someSecret");
-        assertThat(encryptedInheritedField, is(instanceOf(Binary.class)));
+        assertThat(encryptedInheritedField).isInstanceOf(Binary.class);
         Object encryptedInheritedFieldData = ((Binary) encryptedInheritedField).getData();
-        assertThat(encryptedInheritedFieldData, is(instanceOf(byte[].class)));
+        assertThat(encryptedInheritedFieldData).isInstanceOf(byte[].class);
         Object noncryptedInheritedField = dbBean.get("notSecret");
-        assertThat(noncryptedInheritedField, is(instanceOf(String.class)));
+        assertThat(noncryptedInheritedField).isInstanceOf(String.class);
     }
 
     @Test(expected = DocumentCryptException.class)
@@ -584,10 +597,10 @@ public abstract class EncryptSystemTest {
         abstractEncryptionEventListener.withSilentDecryptionFailure(true);
 
         List<MyBean> all = mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
-        assertThat(all, hasSize(1));
+        assertThat(all).hasSize(1);
 
-        assertThat(all.get(0).secretString, is(nullValue()));
-        assertThat(all.get(0).nonSensitiveData, is(notNullValue()));
+        assertThat(all.get(0).secretString).isNull();
+        assertThat(all.get(0).nonSensitiveData).isNotNull();
     }
 
     @Test
@@ -599,8 +612,8 @@ public abstract class EncryptSystemTest {
 
         // default key version should now be 2
         byte[] result = cryptedResultInDb("1234");
-        assertThat(result.length, is(cryptVault.expectedCryptedLength(4 + 12)));
-        assertThat(fromSignedByte(result[0]), is(2));
+        assertThat(result.length).isEqualTo(cryptVault.expectedCryptedLength(4 + 12));
+        assertThat(fromSignedByte(result[0])).isEqualTo(2);
     }
 
     @Test
@@ -615,20 +628,20 @@ public abstract class EncryptSystemTest {
         cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(2, Base64.getDecoder().decode("IqWTpi549pJDZ1kuc9HppcMxtPfu2SP6Idlh+tz4LL4="));
         byte[] result3 = cryptedResultInDb("versioning test");
 
-        assertThat(fromSignedByte(result1[0]), is(0));
-        assertThat(fromSignedByte(result2[0]), is(1));
-        assertThat(fromSignedByte(result3[0]), is(2));
+        assertThat(fromSignedByte(result1[0])).isEqualTo(0);
+        assertThat(fromSignedByte(result2[0])).isEqualTo(1);
+        assertThat(fromSignedByte(result3[0])).isEqualTo(2);
 
         // sanity check that all of the versions are encrypted
         List<MyBean> all = mongoTemplate.find(query(where(MONGO_SECRETSTRING).is("versioning test")), MyBean.class);
-        assertThat(all, hasSize(0));
+        assertThat(all).hasSize(0);
 
         all = mongoTemplate.find(query(where(MONGO_NONSENSITIVEDATA).is(getClass().getSimpleName())), MyBean.class);
-        assertThat(all, hasSize(3));
+        assertThat(all).hasSize(3);
 
         // check that all 3 different versions are decrypted
         for (MyBean bean : all) {
-            assertThat(bean.secretString, is("versioning test"));
+            assertThat(bean.secretString).isEqualTo("versioning test");
         }
     }
 
@@ -640,25 +653,25 @@ public abstract class EncryptSystemTest {
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
         Object cryptedSecret = fromMongo.get(MONGO_SECRETSTRING);
-        assertThat(cryptedSecret, is(instanceOf(Binary.class)));
+        assertThat(cryptedSecret).isInstanceOf(Binary.class);
         Object cryptedSecretData = ((Binary) cryptedSecret).getData();
-        assertThat(cryptedSecretData, is(instanceOf(byte[].class)));
+        assertThat(cryptedSecretData).isInstanceOf(byte[].class);
         return (byte[]) cryptedSecretData;
     }
 
     static void assertCryptException(Exception e, String collectionName, ObjectId objectId, String fieldName) {
-        assertThat(e, instanceOf(DocumentCryptException.class));
+        assertThat(e).isInstanceOf(DocumentCryptException.class);
         DocumentCryptException dce = (DocumentCryptException) e;
-        assertThat(dce.getCollectionName(), is(collectionName));
-        if (objectId != null) assertThat(dce.getId(), is(objectId));
-        else assertNotNull(dce.getId());
+        assertThat(dce.getCollectionName()).isEqualTo(collectionName);
+        if (objectId != null) assertThat(dce.getId()).isEqualTo(objectId);
+        else assertThat(dce.getId()).isNotNull();
 
         Throwable dceCause = dce.getCause();
-        assertThat(dceCause, instanceOf(FieldCryptException.class));
+        assertThat(dceCause).isInstanceOf(FieldCryptException.class);
         FieldCryptException fce = (FieldCryptException) dceCause;
-        assertThat(fce.getMessage(), is(fieldName));
+        assertThat(fce.getMessage()).isEqualTo(fieldName);
 
         Throwable fceCause = fce.getCause();
-        assertThat(fceCause, instanceOf(CryptOperationException.class));
+        assertThat(fceCause).isInstanceOf(CryptOperationException.class);
     }
 }
