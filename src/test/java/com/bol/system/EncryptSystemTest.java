@@ -37,6 +37,7 @@ public abstract class EncryptSystemTest {
         mongoTemplate.dropCollection(MyBean.class);
         mongoTemplate.dropCollection(Person.class);
         mongoTemplate.dropCollection(RenamedField.class);
+        mongoTemplate.dropCollection(PrimitiveField.class);
     }
 
     @Test
@@ -71,14 +72,18 @@ public abstract class EncryptSystemTest {
     @Test
     public void checkEncryptPrimitives() {
         PrimitiveField bean = new PrimitiveField();
+        bean.id = UUID.randomUUID();
         bean.primitiveInt = 1;
         bean.encryptedPrimitiveInt = 2;
+        bean.data = new byte[]{1, 2, 3};
         mongoTemplate.save(bean);
 
         PrimitiveField fromDb = mongoTemplate.findOne(new Query(), PrimitiveField.class);
 
+        assertThat(fromDb.id).isEqualTo(bean.id);
         assertThat(fromDb.primitiveInt).isEqualTo(bean.primitiveInt);
         assertThat(fromDb.encryptedPrimitiveInt).isEqualTo(bean.encryptedPrimitiveInt);
+        assertThat(fromDb.data).isEqualTo(bean.data);
 
         // FIXME: test for DB encoding of java primitives
     }
