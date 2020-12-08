@@ -177,8 +177,8 @@ To circumvent the `_class` feature of `spring-data-mongodb`, install a custom mo
 ```java
     @Override
     @Bean
-    public MappingMongoConverter mappingMongoConverter() throws Exception {
-        MappingMongoConverter converter = super.mappingMongoConverter();
+    public MappingMongoConverter mappingMongoConverter(MongoDatabaseFactory databaseFactory, MongoCustomConversions customConversions, MongoMappingContext mappingContext) {
+        MappingMongoConverter converter = super.mappingMongoConverter(databaseFactory, customConversions, mappingContext);
         // NB: without overriding defaultMongoTypeMapper, an _class field is put in every document
         // since we know exactly which java class a specific document maps to, this is surplus
         converter.setTypeMapper(new DefaultMongoTypeMapper(null));
