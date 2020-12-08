@@ -21,6 +21,7 @@ Allows any field to be marked with `@Encrypted` for per-field encryption.
 ## Backwards compatibility
 
 For spring-data 1 projects, please use the [spring-data-1](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-1) branch.
+For spring-data 2 projects, please use the [spring-data-2](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-2) branch.
 
 ## For the impatient
 
@@ -30,7 +31,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>2.5.1</version>
+            <version>2.6.0</version>
         </dependency>
 ```
 
