@@ -1,16 +1,23 @@
 package com.bol.system;
 
 import com.bol.crypt.CryptVault;
+import com.mongodb.ConnectionString;
+import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import org.bson.UuidRepresentation;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
+import org.springframework.data.mongodb.core.convert.DefaultMongoTypeMapper;
+import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
+import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 
 import java.util.Base64;
-import java.util.Collection;
-import java.util.Collections;
 
 @Configuration
 public abstract class MongoDBConfiguration extends AbstractMongoClientConfiguration {
@@ -26,14 +33,12 @@ public abstract class MongoDBConfiguration extends AbstractMongoClientConfigurat
     }
 
     @Override
-    protected Collection<String> getMappingBasePackages() {
-        return Collections.singletonList(MongoDBConfiguration.class.getPackage().getName());
-    }
-
-    @Override
     public MongoClient mongoClient() {
-        String connectionString = "mongodb://localhost:" + port;
-        return MongoClients.create(connectionString);
+        return MongoClients.create(MongoClientSettings.builder()
+                .uuidRepresentation(UuidRepresentation.STANDARD)
+                .applyConnectionString(new ConnectionString("mongodb://localhost:" + port))
+                .build()
+        );
     }
 
     @Bean

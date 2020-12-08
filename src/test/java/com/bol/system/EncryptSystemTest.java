@@ -28,9 +28,9 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 // FIXME: BSON sizes test for map and set is a bit flaky, need to investigate exact on-disk binary format deeper
 public abstract class EncryptSystemTest {
 
-    @Autowired MongoTemplate mongoTemplate;
-    @Autowired CryptVault cryptVault;
-    @Autowired AbstractEncryptionEventListener abstractEncryptionEventListener;
+    @Autowired protected MongoTemplate mongoTemplate;
+    @Autowired protected CryptVault cryptVault;
+    @Autowired protected AbstractEncryptionEventListener abstractEncryptionEventListener;
 
     @Before
     public void cleanDb() {
