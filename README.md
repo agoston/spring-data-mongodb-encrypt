@@ -260,6 +260,9 @@ mongodb.encrypt:
 
 to override which version of the defined keys is considered 'default'.
 
+## Caveats
+
+Keep in mind that this library hooks into spring-data's serialization/deserialization only. As such, any operation that bypasses this, for example `findAndModify()` or direct mongo driver accesses (`mongoTemplate.getCollection()`), will not do any encryption/decryption. You can either find another way to achieve your goal via spring-data, or you will have to do the encryption/decryption manually. See the next paragraph for examples.
 
 ## Encrypt other data
 
