@@ -29,7 +29,8 @@ public class AbstractEncryptionEventListener<T> extends AbstractMongoEventListen
 
             if (o instanceof Binary) data = ((Binary) o).getData();
             else if (o instanceof byte[]) data = (byte[]) o;
-            else throw new IllegalStateException("Got " + o.getClass() + ", expected: Binary or byte[]");
+            else if (!silentDecryptionFailure) throw new IllegalStateException("Got " + o.getClass() + ", expected: Binary or byte[]");
+            else return o;    // e.g. crypted field not encrypted, other issues - we do our best
 
             try {
                 byte[] serialized = cryptVault.decrypt((data));
@@ -66,7 +67,6 @@ public class AbstractEncryptionEventListener<T> extends AbstractMongoEventListen
 
     class Encoder extends BasicBSONEncoder implements Function<Object, Object> {
         public Object apply(Object o) {
-            // FIXME: switch to BsonDocumentWriter
             // we need to put even BSONObject and BSONList in a wrapping object before serialization, otherwise the type information is not encoded.
             // this is not particularly effective, however, it is the same that mongo driver itself uses on the wire, so it has 100% compatibility w.r.t de/serialization
             byte[] serialized = encode(new BasicBSONObject("", o));
