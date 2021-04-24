@@ -10,6 +10,7 @@ import org.bson.types.Binary;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.internal.Throwables;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
@@ -17,8 +18,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static com.bol.crypt.CryptVault.fromSignedByte;
+import static com.bol.system.model.InitBean.*;
 import static com.bol.system.model.MyBean.MONGO_NONSENSITIVEDATA;
 import static com.bol.system.model.MyBean.MONGO_SECRETSTRING;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +44,7 @@ public abstract class EncryptSystemTest {
         mongoTemplate.dropCollection(Person.class);
         mongoTemplate.dropCollection(RenamedField.class);
         mongoTemplate.dropCollection(PrimitiveField.class);
+        mongoTemplate.dropCollection(InitBean.class);
     }
 
     @Test
@@ -648,6 +655,43 @@ public abstract class EncryptSystemTest {
         for (MyBean bean : all) {
             assertThat(bean.secretString).isEqualTo("versioning test");
         }
+    }
+
+    // ReflectionCache is not initialized yet, and we hammer building it in parallel
+    @Test
+    public void checkParallelInitialization() {
+        int nThreads = Math.max(4, Runtime.getRuntime().availableProcessors());
+        ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
+
+        ArrayList<Future<String>> futures = new ArrayList<>();
+
+        for (int i = 0; i < nThreads; i++) {
+            futures.add(
+                    executorService.submit(() -> {
+                        InitBean initBean = new InitBean();
+                        initBean.addSubBean("my data 2");
+                        initBean.data1 = "my data 1";
+                        mongoTemplate.save(initBean);
+                        return initBean.id;
+                    })
+            );
+        }
+
+        futures.forEach(f -> {
+            try {
+                String id = f.get(10, TimeUnit.SECONDS);
+                assertThat(id).isNotNull();
+
+                Document fromMongo = mongoTemplate.getCollection(InitBean.MONGO_INITBEAN).find(new Document("_id", new ObjectId(id))).first();
+                Object data1 = fromMongo.get(MONGO_DATA1);
+                assertThat(data1).isInstanceOf(Binary.class);
+                List list = (List)fromMongo.get(MONGO_SUB_BEANS);
+                assertThat(list).hasSize(1);
+                Document subBean = (Document)list.get(0);
+                assertThat(subBean.get(MONGO_DATA2)).isInstanceOf(Binary.class);
+            } catch (Exception e) {
+            }
+        });
     }
 
     byte[] cryptedResultInDb(String value) {

@@ -4,7 +4,6 @@ import com.bol.secure.Encrypted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.mapping.Field;
-import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Modifier;
@@ -17,21 +16,30 @@ public class ReflectionCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);
 
-    private Map<Class, List<Node>> reflectionCache = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Class, List<Node>> reflectionCache = new ConcurrentHashMap<>();
 
     // used by CachedEncryptionEventListener to gather metadata of a class and all it fields, recursively.
     public List<Node> reflectRecursive(Class objectClass) {
-        List<Node> result = reflectionCache.get(objectClass);
-        if (result != null) {
-            LOG.trace("cyclic reference found; {} is already mapped", objectClass.getName());
-            return result;
-        }
+        List<Node> nodes = reflectionCache.get(objectClass);
+        if (nodes != null) return nodes;
 
-        // java primitive type; ignore
-        if (ClassUtils.isPrimitiveOrWrapper(objectClass)) return Collections.emptyList();
+        synchronized (this) {
+            return buildRecursive(objectClass, new HashMap<>());
+        }
+    }
+
+    // building is necessary to avoid putting half-processed data in `reflectionCache` (where it would be returned to other threads)
+    private List<Node> buildRecursive(Class objectClass, HashMap<Class, List<Node>> building) {
+        if (isPrimitive(objectClass)) return Collections.emptyList();
+
+        List<Node> processed = reflectionCache.get(objectClass);
+        if (processed != null) return processed;
+
+        List<Node> processing = building.get(objectClass);
+        if (processing != null) return processing;
 
         List<Node> nodes = new ArrayList<>();
-        reflectionCache.put(objectClass, nodes);
+        building.put(objectClass, nodes);
 
         ReflectionUtils.doWithFields(objectClass, field -> {
             String fieldName = field.getName();
@@ -49,16 +57,16 @@ public class ReflectionCache {
                     Type fieldGenericType = field.getGenericType();
 
                     if (Collection.class.isAssignableFrom(fieldType)) {
-                        List<Node> children = processParameterizedTypes(fieldGenericType);
+                        List<Node> children = processParameterizedTypes(fieldGenericType, building);
                         if (!children.isEmpty()) nodes.add(new Node(fieldName, documentName, unwrap(children), Node.Type.LIST, field));
 
                     } else if (Map.class.isAssignableFrom(fieldType)) {
-                        List<Node> children = processParameterizedTypes(fieldGenericType);
+                        List<Node> children = processParameterizedTypes(fieldGenericType, building);
                         if (!children.isEmpty()) nodes.add(new Node(fieldName, documentName, unwrap(children), Node.Type.MAP, field));
 
                     } else {
                         // descending into sub-documents
-                        List<Node> children = reflectRecursive(fieldType);
+                        List<Node> children = buildRecursive(fieldType, building);
                         if (!children.isEmpty()) nodes.add(new Node(fieldName, documentName, children, Node.Type.DOCUMENT, field));
                     }
                 }
@@ -68,23 +76,21 @@ public class ReflectionCache {
             }
         });
 
+        reflectionCache.put(objectClass, nodes);
+
         return nodes;
     }
 
     // used by ReflectionEncryptionEventListener to map a single Document
-    // FIXME: this is a slimmed down copy-paste of reflectRecursive(); find a way to bring Cached and Reflective listener closer together!
     public List<Node> reflectSingle(Class objectClass) {
-        List<Node> result = reflectionCache.get(objectClass);
-        if (result != null) {
-            LOG.trace("cyclic reference found; {} is already mapped", objectClass.getName());
-            return result;
-        }
+        return reflectionCache.computeIfAbsent(objectClass, this::buildSingle);
+    }
 
-        // java primitive type; ignore
-        if (objectClass.getPackage().getName().equals("java.lang")) return Collections.emptyList();
+    // FIXME: this is a slimmed down copy-paste of buildRecursive(); find a way to bring Cached and Reflective listener closer together!
+    private List<Node> buildSingle(Class objectClass) {
+        if (isPrimitive(objectClass)) return Collections.emptyList();
 
         List<Node> nodes = new ArrayList<>();
-        reflectionCache.put(objectClass, nodes);
 
         ReflectionUtils.doWithFields(objectClass, field -> {
             String fieldName = field.getName();
@@ -99,7 +105,6 @@ public class ReflectionCache {
 
                 } else {
                     Class<?> fieldType = field.getType();
-                    Type fieldGenericType = field.getGenericType();
 
                     if (Collection.class.isAssignableFrom(fieldType)) {
                         nodes.add(new Node(fieldName, documentName, Collections.emptyList(), Node.Type.LIST, field));
@@ -120,9 +125,9 @@ public class ReflectionCache {
         return nodes;
     }
 
-    List<Node> processParameterizedTypes(Type type) {
+    List<Node> processParameterizedTypes(Type type, HashMap<Class, List<Node>> building) {
         if (type instanceof Class) {
-            List<Node> children = reflectRecursive((Class) type);
+            List<Node> children = buildRecursive((Class) type, building);
             if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.DOCUMENT));
 
         } else if (type instanceof ParameterizedType) {
@@ -130,11 +135,11 @@ public class ReflectionCache {
             Class rawType = (Class) subType.getRawType();
 
             if (Collection.class.isAssignableFrom(rawType)) {
-                List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[0]);
+                List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[0], building);
                 if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.LIST));
 
             } else if (Map.class.isAssignableFrom(rawType)) {
-                List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[1]);
+                List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[1], building);
                 if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.MAP));
 
             } else {
@@ -170,5 +175,25 @@ public class ReflectionCache {
             }
         }
         return fieldName;
+    }
+
+    // same as ClassUtils.isPrimitiveOrWrapper(), but also includes String
+    public static boolean isPrimitive(Class clazz) {
+        return clazz.isPrimitive() || primitiveClasses.contains(clazz);
+    }
+
+    private static Set<Class> primitiveClasses = new HashSet<>();
+
+    static {
+        primitiveClasses.add(Boolean.class);
+        primitiveClasses.add(Byte.class);
+        primitiveClasses.add(Character.class);
+        primitiveClasses.add(Double.class);
+        primitiveClasses.add(Float.class);
+        primitiveClasses.add(Integer.class);
+        primitiveClasses.add(Long.class);
+        primitiveClasses.add(Short.class);
+        primitiveClasses.add(Void.class);
+        primitiveClasses.add(String.class);
     }
 }

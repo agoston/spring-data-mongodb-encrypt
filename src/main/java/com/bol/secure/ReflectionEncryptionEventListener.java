@@ -16,9 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static com.bol.reflection.Node.Type.*;
+import static com.bol.reflection.Node.Type.DIRECT;
+import static com.bol.reflection.ReflectionCache.isPrimitive;
 
-// FIXME: check if we could bring CachedEncryptionEventListener and ReflectionEncryptionEventListener closer together; they are after all doing the same thing, just one at startup, one runtime
 /**
  * This is a reimplementation of {@link CachedEncryptionEventListener}, to support polymorphism.
  * This means that while instead of walking by pre-cached class reflection, we have to walk by the Document provided and
@@ -62,8 +62,8 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
     }
 
     void diveInto(Object value, Type type, Function<Object, Object> crypt) {
-        // primitive type, nothing to do here
-        if (value.getClass().getPackage().getName().equals("java.lang")) return;
+        // java primitive type; ignore
+        if (isPrimitive(value.getClass())) return;
 
         Class reflectiveClass = null;
         Type[] typeArguments = null;

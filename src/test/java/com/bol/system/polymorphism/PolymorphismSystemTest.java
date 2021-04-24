@@ -1,6 +1,5 @@
 package com.bol.system.polymorphism;
 
-import com.bol.crypt.CryptVault;
 import com.bol.system.model.Person;
 import com.bol.system.polymorphism.model.SubObject;
 import com.bol.system.polymorphism.model.TestObject;
@@ -27,10 +26,7 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 @SpringBootTest(classes = {ReflectionMongoDBConfiguration.class})
 public class PolymorphismSystemTest {
 
-    @Autowired
-    MongoTemplate mongoTemplate;
-    @Autowired
-    CryptVault cryptVault;
+    @Autowired MongoTemplate mongoTemplate;
 
     @Before
     public void cleanDb() {
