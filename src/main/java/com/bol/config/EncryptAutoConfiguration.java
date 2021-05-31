@@ -1,40 +1,33 @@
 package com.bol.config;
 
+import com.bol.config.CryptVaultAutoConfiguration.CryptVaultConfigurationProperties;
 import com.bol.crypt.CryptVault;
 import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.secure.CachedEncryptionEventListener;
 import com.bol.secure.ReflectionEncryptionEventListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
-import java.util.Base64;
-import java.util.List;
-
 @Configuration
-@ConditionalOnProperty("mongodb.encrypt.keys[0].key")
 public class EncryptAutoConfiguration {
 
     @Bean
+    /** This allows user to create and configure their own CryptVault, or rely on a global CryptVault from the standalone `cryptvault` library;
+     * This CryptVault config is merely a convenience fallback, and also offers backwards compatibility with version 2.6.2 and below */
+    @ConditionalOnMissingBean(CryptVault.class)
+    @ConditionalOnProperty(prefix = "mongodb.encrypt", name = "keys[0].key")
     CryptVault cryptVault(EncryptConfigurationProperties properties) {
-        CryptVault cryptVault = new CryptVault();
-        if (properties.keys == null || properties.keys.isEmpty()) throw new IllegalArgumentException("mongodb.encrypt.keys is empty");
-
-        for (Key key : properties.keys) {
-            byte[] secretKeyBytes = Base64.getDecoder().decode(key.key);
-            cryptVault.with256BitAesCbcPkcs5PaddingAnd128BitSaltKey(key.version, secretKeyBytes);
-        }
-
-        if (properties.defaultKey != null) {
-            cryptVault.withDefaultKeyVersion(properties.defaultKey);
-        }
-
-        return cryptVault;
+        return new CryptVaultAutoConfiguration().cryptVault(properties);
     }
 
     @Bean
+    @ConditionalOnMissingBean({ReflectionEncryptionEventListener.class, CachedEncryptionEventListener.class})
+    @ConditionalOnProperty(prefix = "mongodb.encrypt", name = {"type", "silent-decryption-failures"})
     AbstractEncryptionEventListener encryptionEventListener(CryptVault cryptVault, EncryptConfigurationProperties properties) {
         AbstractEncryptionEventListener eventListener;
         if ("reflection".equalsIgnoreCase(properties.type)) {
@@ -50,19 +43,9 @@ public class EncryptAutoConfiguration {
 
     @Component
     @ConfigurationProperties("mongodb.encrypt")
-    public static class EncryptConfigurationProperties {
-        List<Key> keys;
-        Integer defaultKey;
+    public static class EncryptConfigurationProperties extends CryptVaultConfigurationProperties {
         String type;
         Boolean silentDecryptionFailures;
-
-        public void setKeys(List<Key> keys) {
-            this.keys = keys;
-        }
-
-        public void setDefaultKey(Integer defaultKey) {
-            this.defaultKey = defaultKey;
-        }
 
         public void setType(String type) {
             this.type = type;
@@ -70,19 +53,6 @@ public class EncryptAutoConfiguration {
 
         public void setSilentDecryptionFailures(Boolean silentDecryptionFailures) {
             this.silentDecryptionFailures = silentDecryptionFailures;
-        }
-    }
-
-    public static class Key {
-        int version;
-        String key;
-
-        public void setVersion(int version) {
-            this.version = version;
-        }
-
-        public void setKey(String key) {
-            this.key = key;
         }
     }
 }
