@@ -13,7 +13,7 @@ Allows any field to be marked with `@Encrypted` for per-field encryption.
 - key versioning (to help migrating to new key without need to convert data)
 - supports 256-bit AES out of the box
 - supports any encryption available in Java (via JCE)
-- simple (<1000 lines of code)
+- simple (cca. 500 lines of code)
 - tested throughly
 - no dependencies
 
