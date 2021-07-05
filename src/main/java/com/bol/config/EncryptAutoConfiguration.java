@@ -5,6 +5,7 @@ import com.bol.crypt.CryptVault;
 import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.secure.CachedEncryptionEventListener;
 import com.bol.secure.ReflectionEncryptionEventListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,7 +28,7 @@ public class EncryptAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean({ReflectionEncryptionEventListener.class, CachedEncryptionEventListener.class})
-    @ConditionalOnProperty(prefix = "mongodb.encrypt", name = {"type", "silent-decryption-failures"})
+    @ConditionalOnBean(CryptVault.class)
     AbstractEncryptionEventListener encryptionEventListener(CryptVault cryptVault, EncryptConfigurationProperties properties) {
         AbstractEncryptionEventListener eventListener;
         if ("reflection".equalsIgnoreCase(properties.type)) {
