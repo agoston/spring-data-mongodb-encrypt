@@ -27,7 +27,7 @@ public class EncryptAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean({ReflectionEncryptionEventListener.class, CachedEncryptionEventListener.class})
+    @ConditionalOnMissingBean({AbstractEncryptionEventListener.class})
     @ConditionalOnBean(CryptVault.class)
     AbstractEncryptionEventListener encryptionEventListener(CryptVault cryptVault, EncryptConfigurationProperties properties) {
         AbstractEncryptionEventListener eventListener;
