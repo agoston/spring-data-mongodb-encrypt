@@ -3,6 +3,7 @@ package com.bol.secure;
 import com.bol.crypt.CryptVault;
 import com.bol.crypt.DocumentCryptException;
 import com.bol.crypt.FieldCryptException;
+import com.bol.reflection.FieldEncryptedPredicate;
 import com.bol.reflection.Node;
 import com.bol.reflection.ReflectionCache;
 import org.bson.Document;
@@ -25,11 +26,17 @@ import static com.bol.reflection.ReflectionCache.isPrimitive;
  * try to match reflection data to it.
  */
 public class ReflectionEncryptionEventListener extends AbstractEncryptionEventListener<ReflectionEncryptionEventListener> {
+
+    final ReflectionCache reflectionCache;
+
     public ReflectionEncryptionEventListener(CryptVault cryptVault) {
-        super(cryptVault);
+        this(cryptVault, FieldEncryptedPredicate.ANNOTATION_PRESENT);
     }
 
-    ReflectionCache reflectionCache = new ReflectionCache();
+    public ReflectionEncryptionEventListener(CryptVault cryptVault, FieldEncryptedPredicate fieldEncryptedPredicate) {
+        super(cryptVault);
+        this.reflectionCache = new ReflectionCache(fieldEncryptedPredicate);
+    }
 
     void cryptDocument(Document document, Class clazz, Function<Object, Object> crypt) {
         List<Node> nodes = reflectionCache.reflectSingle(clazz);

@@ -3,6 +3,7 @@ package com.bol.secure;
 import com.bol.crypt.CryptVault;
 import com.bol.crypt.DocumentCryptException;
 import com.bol.crypt.FieldCryptException;
+import com.bol.reflection.FieldEncryptedPredicate;
 import com.bol.reflection.Node;
 import com.bol.reflection.ReflectionCache;
 import org.bson.Document;
@@ -18,10 +19,15 @@ import java.util.function.Function;
  * Does not support polymorphism and does not need '_class' fields either.
  */
 public class CachedEncryptionEventListener extends AbstractEncryptionEventListener<CachedEncryptionEventListener> {
-    ReflectionCache reflectionCache = new ReflectionCache();
+    final ReflectionCache reflectionCache;
 
     public CachedEncryptionEventListener(CryptVault cryptVault) {
+        this(cryptVault, FieldEncryptedPredicate.ANNOTATION_PRESENT);
+    }
+
+    public CachedEncryptionEventListener(CryptVault cryptVault, FieldEncryptedPredicate fieldEncryptedPredicate) {
         super(cryptVault);
+        reflectionCache = new ReflectionCache(fieldEncryptedPredicate);
     }
 
     Node node(Class clazz) {
