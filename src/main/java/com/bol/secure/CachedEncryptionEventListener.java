@@ -3,7 +3,6 @@ package com.bol.secure;
 import com.bol.crypt.CryptVault;
 import com.bol.crypt.DocumentCryptException;
 import com.bol.crypt.FieldCryptException;
-import com.bol.reflection.FieldEncryptedPredicate;
 import com.bol.reflection.Node;
 import com.bol.reflection.ReflectionCache;
 import org.bson.Document;

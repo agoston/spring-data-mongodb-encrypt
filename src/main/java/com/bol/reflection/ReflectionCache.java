@@ -1,6 +1,6 @@
 package com.bol.reflection;
 
-import com.bol.secure.Encrypted;
+import com.bol.secure.FieldEncryptedPredicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.mapping.Field;
@@ -12,7 +12,7 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.bol.reflection.FieldEncryptedPredicate.ANNOTATION_PRESENT;
+import static com.bol.secure.FieldEncryptedPredicate.ANNOTATION_PRESENT;
 
 public class ReflectionCache {
 
@@ -111,7 +111,7 @@ public class ReflectionCache {
 
                 String documentName = parseFieldAnnotation(field, fieldName);
 
-                if (field.isAnnotationPresent(Encrypted.class)) {
+                if (fieldEncryptedPredicate.test(field)) {
                     // direct @Encrypted annotation - crypt the corresponding field of BasicDbObject
                     nodes.add(new Node(fieldName, documentName, Collections.emptyList(), Node.Type.DIRECT, field));
 

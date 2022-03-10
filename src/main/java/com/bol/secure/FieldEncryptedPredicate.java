@@ -1,6 +1,4 @@
-package com.bol.reflection;
-
-import com.bol.secure.Encrypted;
+package com.bol.secure;
 
 import java.lang.reflect.Field;
 import java.util.function.Predicate;
