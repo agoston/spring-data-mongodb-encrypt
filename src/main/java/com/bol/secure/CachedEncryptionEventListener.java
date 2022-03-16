@@ -18,10 +18,15 @@ import java.util.function.Function;
  * Does not support polymorphism and does not need '_class' fields either.
  */
 public class CachedEncryptionEventListener extends AbstractEncryptionEventListener<CachedEncryptionEventListener> {
-    ReflectionCache reflectionCache = new ReflectionCache();
+    final ReflectionCache reflectionCache;
 
     public CachedEncryptionEventListener(CryptVault cryptVault) {
+        this(cryptVault, FieldEncryptedPredicate.ANNOTATION_PRESENT);
+    }
+
+    public CachedEncryptionEventListener(CryptVault cryptVault, FieldEncryptedPredicate fieldEncryptedPredicate) {
         super(cryptVault);
+        reflectionCache = new ReflectionCache(fieldEncryptedPredicate);
     }
 
     Node node(Class clazz) {

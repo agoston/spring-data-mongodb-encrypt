@@ -17,6 +17,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,6 +39,8 @@ public abstract class EncryptSystemTest {
     @Autowired protected CryptVault cryptVault;
     @Autowired protected AbstractEncryptionEventListener abstractEncryptionEventListener;
 
+    private CryptAssert cryptAssert;
+
     @Before
     public void cleanDb() {
         mongoTemplate.dropCollection(MyBean.class);
@@ -45,6 +48,11 @@ public abstract class EncryptSystemTest {
         mongoTemplate.dropCollection(RenamedField.class);
         mongoTemplate.dropCollection(PrimitiveField.class);
         mongoTemplate.dropCollection(InitBean.class);
+    }
+
+    @PostConstruct
+    void postConstruct() {
+        cryptAssert = new CryptAssert(cryptVault);
     }
 
     @Test
@@ -68,12 +76,12 @@ public abstract class EncryptSystemTest {
 
         Document fromMongo = mongoTemplate.getCollection(MyBean.MONGO_MYBEAN).find(new Document("_id", new ObjectId(bean.id))).first();
         assertThat(fromMongo.get(MyBean.MONGO_NONSENSITIVEDATA)).isEqualTo(bean.nonSensitiveData);
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length() + 12);
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRING), bean.secretString.length() + 12);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETLONG), 8);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETBOOLEAN), 1);
         // 12 is a magic constant that seems to be the overhead when serializing list of strings to BSON with mongo driver 3.4.2
         int expectedLength = 12 + bean.secretStringList.stream().mapToInt(s -> s.length() + 8).sum();
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), expectedLength);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSTRINGLIST), expectedLength);
     }
 
     @Test
@@ -133,7 +141,7 @@ public abstract class EncryptSystemTest {
                 + MySubBean.MONGO_NONSENSITIVEDATA.length() + subBean.secretString.length() + 7
                 + MySubBean.MONGO_SECRETSTRING.length() + subBean.nonSensitiveData.length() + 7;
 
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSUBBEAN), expectedLength);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSUBBEAN), expectedLength);
     }
 
     @Test
@@ -152,7 +160,7 @@ public abstract class EncryptSystemTest {
         Document subMongo = (Document) fromMongo.get(MyBean.MONGO_NONSENSITIVESUBBEAN);
 
         assertThat(subMongo.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(subBean.nonSensitiveData);
-        assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
+        cryptAssert.assertCryptLength(subMongo.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
     }
 
     @Test
@@ -180,7 +188,7 @@ public abstract class EncryptSystemTest {
             Document basicDBObject = (Document) subMongo.get(i);
             MySubBean subBean = bean.nonSensitiveSubBeanList.get(i);
             assertThat(basicDBObject.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(subBean.nonSensitiveData);
-            assertCryptLength(basicDBObject.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
+            cryptAssert.assertCryptLength(basicDBObject.get(MySubBean.MONGO_SECRETSTRING), subBean.secretString.length() + 12);
         }
     }
 
@@ -209,8 +217,8 @@ public abstract class EncryptSystemTest {
 
         assertThat(oneMongo.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(map.get("one").nonSensitiveData);
         assertThat(twoMongo.get(MySubBean.MONGO_NONSENSITIVEDATA)).isEqualTo(map.get("two").nonSensitiveData);
-        assertCryptLength(oneMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("one").secretString.length() + 12);
-        assertCryptLength(twoMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("two").secretString.length() + 12);
+        cryptAssert.assertCryptLength(oneMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("one").secretString.length() + 12);
+        cryptAssert.assertCryptLength(twoMongo.get(MySubBean.MONGO_SECRETSTRING), map.get("two").secretString.length() + 12);
     }
 
     @Test
@@ -239,7 +247,7 @@ public abstract class EncryptSystemTest {
                 + MySubBean.MONGO_NONSENSITIVEDATA.length() + map.get("two").secretString.length() + 7
                 + MySubBean.MONGO_SECRETSTRING.length() + map.get("two").nonSensitiveData.length() + 7;
 
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETMAP), expectedLength);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETMAP), expectedLength);
     }
 
     @Test
@@ -262,7 +270,7 @@ public abstract class EncryptSystemTest {
                 + "one".length() + 7
                 + "two".length() + 7;
 
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSETPRIMITIVE), expectedLength);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSETPRIMITIVE), expectedLength);
     }
 
     @Test
@@ -289,33 +297,9 @@ public abstract class EncryptSystemTest {
                 + MySubBean.MONGO_NONSENSITIVEDATA.length() + "grass is green".length() + 12
                 + MySubBean.MONGO_SECRETSTRING.length() + "earth is flat".length() + 12;
 
-        assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSETSUBDOCUMENT), expectedLength);
+        cryptAssert.assertCryptLength(fromMongo.get(MyBean.MONGO_SECRETSETSUBDOCUMENT), expectedLength);
     }
 
-    /**
-     * simplistic mongodb BSON serialization lengths:
-     * - 10 bytes for wrapping BSONObject prefix
-     * - 1 byte prefix before field name
-     * - field name (1 byte/char)
-     * - 1 byte 0-terminator after field name
-     * - 4 byte prefix before field value
-     * - field value (1byte/char)
-     * - 1 byte 0-terminator after field value
-     * - 2 bytes 0 terminator for wrapping BSONObject
-     * <p>
-     * (e.g. for a single primitive string, 12 extra bytes are added above its own length)
-     */
-    public void assertCryptLength(Object cryptedSecretBinary, int serializedLength) {
-        assertThat(cryptedSecretBinary).isInstanceOf(Binary.class);
-
-        Object cryptedSecretBytes = ((Binary) cryptedSecretBinary).getData();
-
-        assertThat(cryptedSecretBytes).isInstanceOf(byte[].class);
-        byte[] cryptedBytes = (byte[]) cryptedSecretBytes;
-
-        int expectedCryptedLength = cryptVault.expectedCryptedLength(serializedLength);
-        assertThat(cryptedBytes.length).isEqualTo(expectedCryptedLength);
-    }
 
     @Test
     public void consecutiveEncryptsDifferentResults() {
