@@ -34,10 +34,10 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
 
     public ReflectionEncryptionEventListener(CryptVault cryptVault, FieldEncryptedPredicate fieldEncryptedPredicate) {
         super(cryptVault);
-        this.reflectionCache = new ReflectionCache(fieldEncryptedPredicate);
+        reflectionCache = new ReflectionCache(fieldEncryptedPredicate);
     }
 
-    void cryptDocument(Document document, Class clazz, Function<Object, Object> crypt) {
+    void cryptDocument(Document document, Class<?> clazz, Function<Object, Object> crypt) {
         List<Node> nodes = reflectionCache.reflectSingle(clazz);
 
         for (Map.Entry<String, Object> field : document.entrySet()) {
@@ -71,15 +71,15 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         // java primitive type; ignore
         if (isPrimitive(value.getClass())) return;
 
-        Class reflectiveClass = null;
+        Class<?> reflectiveClass = null;
         Type[] typeArguments = null;
-        if (type instanceof Class) reflectiveClass = (Class) type;
+        if (type instanceof Class) reflectiveClass = (Class<?>) type;
         else if (type instanceof ParameterizedType) {
             ParameterizedType parameterizedType = (ParameterizedType) type;
             Type rawType = parameterizedType.getRawType();
             typeArguments = parameterizedType.getActualTypeArguments();
             if (!(rawType instanceof Class)) throw new IllegalArgumentException("Unknown reflective type class " + type);
-            reflectiveClass = (Class) rawType;
+            reflectiveClass = (Class<?>) rawType;
         } else throw new IllegalArgumentException("Unknown reflective type class " + type);
 
         if (value instanceof Document) {
@@ -87,7 +87,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
             if (Map.class.isAssignableFrom(reflectiveClass)) {
                 Type subFieldType = typeArguments[1];
 
-                for (Map.Entry entry : ((Map<?, ?>) value).entrySet()) {
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                     try {
                         diveInto(entry.getValue(), subFieldType, crypt);
                     } catch (FieldCryptException e) {
@@ -106,7 +106,7 @@ public class ReflectionEncryptionEventListener extends AbstractEncryptionEventLi
         } else if (value instanceof List) {
             if (Collection.class.isAssignableFrom(reflectiveClass)) {
                 Type subFieldType = typeArguments[0];
-                List list = (List) value;
+                List<?> list = (List<?>) value;
 
                 for (int i = 0; i < list.size(); i++) {
                     try {

@@ -9,11 +9,7 @@ import org.junit.runner.RunWith;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import java.util.Arrays;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.data.mongodb.core.query.Criteria.where;
-import static org.springframework.data.mongodb.core.query.Query.query;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {CachedMongoDBConfiguration.class})

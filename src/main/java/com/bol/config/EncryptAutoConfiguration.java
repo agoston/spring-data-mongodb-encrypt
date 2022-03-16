@@ -6,7 +6,6 @@ import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.secure.CachedEncryptionEventListener;
 import com.bol.secure.ReflectionEncryptionEventListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;

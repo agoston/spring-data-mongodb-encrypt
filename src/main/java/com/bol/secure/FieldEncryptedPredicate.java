@@ -5,6 +5,6 @@ import java.util.function.Predicate;
 
 public interface FieldEncryptedPredicate extends Predicate<Field> {
 
-  FieldEncryptedPredicate ANNOTATION_PRESENT = field -> field.isAnnotationPresent(Encrypted.class);
+    FieldEncryptedPredicate ANNOTATION_PRESENT = field -> field.isAnnotationPresent(Encrypted.class);
 
 }

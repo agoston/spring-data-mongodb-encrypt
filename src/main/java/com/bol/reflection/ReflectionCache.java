@@ -12,26 +12,19 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.bol.secure.FieldEncryptedPredicate.ANNOTATION_PRESENT;
-
 public class ReflectionCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReflectionCache.class);
 
-    private final ConcurrentHashMap<Class, List<Node>> reflectionCache = new ConcurrentHashMap<>();
-
+    private final ConcurrentHashMap<Class<?>, List<Node>> reflectionCache = new ConcurrentHashMap<>();
     private final FieldEncryptedPredicate fieldEncryptedPredicate;
-
-    public ReflectionCache() {
-        this(ANNOTATION_PRESENT);
-    }
 
     public ReflectionCache(FieldEncryptedPredicate fieldEncryptedPredicate) {
         this.fieldEncryptedPredicate = fieldEncryptedPredicate;
     }
 
     // used by CachedEncryptionEventListener to gather metadata of a class and all it fields, recursively.
-    public List<Node> reflectRecursive(Class objectClass) {
+    public List<Node> reflectRecursive(Class<?> objectClass) {
         List<Node> nodes = reflectionCache.get(objectClass);
         if (nodes != null) return nodes;
 
@@ -41,7 +34,7 @@ public class ReflectionCache {
     }
 
     // building is necessary to avoid putting half-processed data in `reflectionCache` (where it would be returned to other threads)
-    private List<Node> buildRecursive(Class objectClass, HashMap<Class, List<Node>> building) {
+    private List<Node> buildRecursive(Class<?> objectClass, HashMap<Class<?>, List<Node>> building) {
         if (isPrimitive(objectClass)) return Collections.emptyList();
 
         List<Node> processed = reflectionCache.get(objectClass);
@@ -94,12 +87,12 @@ public class ReflectionCache {
     }
 
     // used by ReflectionEncryptionEventListener to map a single Document
-    public List<Node> reflectSingle(Class objectClass) {
+    public List<Node> reflectSingle(Class<?> objectClass) {
         return reflectionCache.computeIfAbsent(objectClass, this::buildSingle);
     }
 
     // FIXME: this is a slimmed down copy-paste of buildRecursive(); find a way to bring Cached and Reflective listener closer together!
-    private List<Node> buildSingle(Class objectClass) {
+    private List<Node> buildSingle(Class<?> objectClass) {
         if (isPrimitive(objectClass)) return Collections.emptyList();
 
         List<Node> nodes = new ArrayList<>();
@@ -137,14 +130,14 @@ public class ReflectionCache {
         return nodes;
     }
 
-    List<Node> processParameterizedTypes(Type type, HashMap<Class, List<Node>> building) {
+    List<Node> processParameterizedTypes(Type type, HashMap<Class<?>, List<Node>> building) {
         if (type instanceof Class) {
-            List<Node> children = buildRecursive((Class) type, building);
+            List<Node> children = buildRecursive((Class<?>) type, building);
             if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.DOCUMENT));
 
         } else if (type instanceof ParameterizedType) {
             ParameterizedType subType = (ParameterizedType) type;
-            Class rawType = (Class) subType.getRawType();
+            Class<?> rawType = (Class<?>) subType.getRawType();
 
             if (Collection.class.isAssignableFrom(rawType)) {
                 List<Node> children = processParameterizedTypes(subType.getActualTypeArguments()[0], building);
@@ -155,7 +148,7 @@ public class ReflectionCache {
                 if (!children.isEmpty()) return Collections.singletonList(new Node(null, children, Node.Type.MAP));
 
             } else {
-                throw new IllegalArgumentException("Unknown reflective raw type class " + rawType.getClass());
+                throw new IllegalArgumentException("Unknown reflective raw type class " + rawType);
             }
 
         } else {
@@ -190,22 +183,20 @@ public class ReflectionCache {
     }
 
     // same as ClassUtils.isPrimitiveOrWrapper(), but also includes String
-    public static boolean isPrimitive(Class clazz) {
+    public static boolean isPrimitive(Class<?> clazz) {
         return clazz.isPrimitive() || primitiveClasses.contains(clazz);
     }
 
-    private static Set<Class> primitiveClasses = new HashSet<>();
-
-    static {
-        primitiveClasses.add(Boolean.class);
-        primitiveClasses.add(Byte.class);
-        primitiveClasses.add(Character.class);
-        primitiveClasses.add(Double.class);
-        primitiveClasses.add(Float.class);
-        primitiveClasses.add(Integer.class);
-        primitiveClasses.add(Long.class);
-        primitiveClasses.add(Short.class);
-        primitiveClasses.add(Void.class);
-        primitiveClasses.add(String.class);
-    }
+    private static final Set<Class<?>> primitiveClasses = new HashSet<>(Arrays.asList(
+            Boolean.class,
+            Byte.class,
+            Character.class,
+            Double.class,
+            Float.class,
+            Integer.class,
+            Long.class,
+            Short.class,
+            Void.class,
+            String.class
+    ));
 }

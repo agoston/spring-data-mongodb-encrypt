@@ -29,7 +29,7 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         reflectionCache = new ReflectionCache(fieldEncryptedPredicate);
     }
 
-    Node node(Class clazz) {
+    Node node(Class<?> clazz) {
         List<Node> children = reflectionCache.reflectRecursive(clazz);
         if (!children.isEmpty()) return new Node("", children, Node.Type.DOCUMENT);
         return Node.EMPTY;
@@ -77,7 +77,7 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
                     break;
 
                 case LIST:
-                    cryptList((List) o, node, crypt);
+                    cryptList((List<?>) o, node, crypt);
                     break;
 
                 default:
@@ -88,7 +88,7 @@ public class CachedEncryptionEventListener extends AbstractEncryptionEventListen
         }
     }
 
-    void cryptList(List list, Node node, Function<Object, Object> crypt) {
+    void cryptList(List<?> list, Node node, Function<Object, Object> crypt) {
         if (node.type != Node.Type.LIST) throw new IllegalArgumentException("Expected list for " + node.fieldName + ", got " + node.type);
 
         Node mapChildren = node.children.get(0);
