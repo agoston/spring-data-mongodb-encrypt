@@ -5,6 +5,7 @@ import com.bol.secure.AbstractEncryptionEventListener;
 import com.bol.system.model.*;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
+import jakarta.annotation.PostConstruct;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.bson.types.ObjectId;
@@ -17,7 +18,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

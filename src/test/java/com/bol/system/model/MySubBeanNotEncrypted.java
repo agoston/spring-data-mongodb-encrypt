@@ -12,6 +12,9 @@ public class MySubBeanNotEncrypted {
     @Field
     public String nonSensitiveData2;
 
+    public MySubBeanNotEncrypted() {
+    }
+
     public MySubBeanNotEncrypted(String nonSensitiveData1, String nonSensitiveData2) {
         this.nonSensitiveData1 = nonSensitiveData1;
         this.nonSensitiveData2 = nonSensitiveData2;

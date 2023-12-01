@@ -31,6 +31,5 @@ public class PlainBean {
       this.sensitiveData = sensitiveData;
     }
   }
-
 }
 

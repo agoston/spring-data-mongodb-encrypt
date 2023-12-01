@@ -27,10 +27,6 @@
         <developer>
             <name>Ágoston Horváth</name>
             <url>github.com/agoston</url>
-            <email>ahorvath@bol.com</email>
-            <organization>bol.com</organization>
-            <timezone>1</timezone>
-            <organizationUrl>http://bol.com</organizationUrl>
         </developer>
     </developers>
 
@@ -48,19 +44,19 @@
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
-            <version>4.5.0</version>
+            <version>[4.5.0,)</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.data</groupId>
             <artifactId>spring-data-mongodb</artifactId>
-            <version>3.3.5</version>
+            <version>4.2.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
-            <version>2.6.15</version>
+            <version>3.2.0</version>
             <scope>provided</scope>
         </dependency>
 
@@ -68,7 +64,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <version>2.6.4</version>
+            <version>3.2.0</version>
             <scope>test</scope>
         </dependency>
 <!--        <dependency>-->

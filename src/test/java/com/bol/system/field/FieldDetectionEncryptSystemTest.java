@@ -3,6 +3,7 @@ package com.bol.system.field;
 import com.bol.crypt.CryptVault;
 import com.bol.system.CryptAssert;
 import com.bol.system.model.PlainBean;
+import jakarta.annotation.PostConstruct;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Before;
@@ -13,7 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import javax.annotation.PostConstruct;
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
