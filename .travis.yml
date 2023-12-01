@@ -1,9 +1,0 @@
-language: java
-
-jdk:
-  - openjdk8
-
-services:
-  - mongodb
-
-script: mvn install

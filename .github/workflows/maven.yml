@@ -15,18 +15,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Start MongoDB
-      uses: supercharge/mongodb-github-action@1.6.0
+      uses: supercharge/mongodb-github-action@1.10.0
       with:
-        mongodb-version: '4.2'
+        mongodb-version: '4.4'
 
     - name: Set up JDK
       uses: actions/setup-java@v2
       with:
-        java-version: '8'
-        distribution: 'adopt'
+        java-version: '17'
+        distribution: 'temurin'
 
     - name: Build with Maven
       run: mvn -B package --file pom.xml
