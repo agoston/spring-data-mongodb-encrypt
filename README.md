@@ -20,7 +20,10 @@ Allows any field to be marked with `@Encrypted` for per-field encryption.
 ## Backwards compatibility
 
 For spring-data 1 projects, please use the [spring-data-1](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-1) branch.
+
 For spring-data 2 projects, please use the [spring-data-2](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-2) branch.
+
+From version `2.9.0`, java 17 or higher is required. If stuck on older java, use version `2.8.0`. 
 
 ## For the impatient
 
