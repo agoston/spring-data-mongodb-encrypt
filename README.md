@@ -33,7 +33,7 @@ Add dependency:
         <dependency>
             <groupId>com.bol</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>2.9.0</version>
+            <version>2.9.1</version>
         </dependency>
 ```
 
@@ -160,6 +160,10 @@ public class MongoDBConfiguration extends AbstractMongoClientConfiguration {
 }
 ```
 
+## Starting mongodb for development (docker)
+
+A `docker-compose.yml` file is provided to allow for quickly running the tests and/or prototyping.
+Use with `docker compose up`.
 
 ## Polymorphism (and why it's bad)
 
