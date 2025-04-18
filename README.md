@@ -1,5 +1,5 @@
-[![Maven Central](https://img.shields.io/maven-central/v/com.bol/spring-data-mongodb-encrypt.svg)](http://search.maven.org/#search%7Cga%7C1%7Ccom.bol)
-[![Build](https://github.com/bolcom/spring-data-mongodb-encrypt/actions/workflows/maven.yml/badge.svg)](https://github.com/bolcom/spring-data-mongodb-encrypt/actions)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.agoston/spring-data-mongodb-encrypt.svg)](http://search.maven.org/#search%7Cga%7C1%7Cio.github.agoston)
+[![Build](https://github.com/agoston/spring-data-mongodb-encrypt/actions/workflows/maven.yml/badge.svg)](https://github.com/agoston/spring-data-mongodb-encrypt/actions)
 
 # spring-data-mongodb-encrypt
 
@@ -19,9 +19,9 @@ Allows any field to be marked with `@Encrypted` for per-field encryption.
 
 ## Backwards compatibility
 
-For spring-data 1 projects, please use the [spring-data-1](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-1) branch.
+For spring-data 1 projects, please use the [spring-data-1](https://github.com/agoston/spring-data-mongodb-encrypt/tree/spring-data-1) branch.
 
-For spring-data 2 projects, please use the [spring-data-2](https://github.com/bolcom/spring-data-mongodb-encrypt/tree/spring-data-2) branch.
+For spring-data 2 projects, please use the [spring-data-2](https://github.com/agoston/spring-data-mongodb-encrypt/tree/spring-data-2) branch.
 
 From version `2.9.0`, java 17 or higher is required. If stuck on older java, use version `2.8.0`. 
 
@@ -31,9 +31,9 @@ Add dependency:
 
 ```xml
         <dependency>
-            <groupId>com.bol</groupId>
+            <groupId>io.github.agoston</groupId>
             <artifactId>spring-data-mongodb-encrypt</artifactId>
-            <version>2.9.1</version>
+            <version>2.9.2</version>
         </dependency>
 ```
 
